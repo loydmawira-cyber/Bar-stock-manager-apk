@@ -1,0 +1,6 @@
+{
+  "name": "Bar Stock Manager",
+  "description": "Bar stock management, verified shift handover, automated sales reconciliation, and dispute resolution platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
