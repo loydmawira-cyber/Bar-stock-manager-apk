@@ -2,6 +2,8 @@ package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -56,6 +58,22 @@ class MainActivity : ComponentActivity() {
 
         val database = BarStockDatabase.getDatabase(applicationContext)
         val repository = BarStockRepository(database.barStockDao())
+        val backupService = com.example.data.repository.BackupService(database.barStockDao())
+
+        var syncJob: kotlinx.coroutines.Job? = null
+        database.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer(
+            "users", "items", "counters", "counter_stocks", "shifts", 
+            "stock_verifications", "shift_closings", "disputes", 
+            "stock_adjustments", "reconciliations", "app_notifications"
+        ) {
+            override fun onInvalidated(tables: Set<String>) {
+                syncJob?.cancel()
+                syncJob = this@MainActivity.lifecycleScope.launch {
+                    kotlinx.coroutines.delay(3000)
+                    backupService.backupData("backup_default")
+                }
+            }
+        })
 
         setContent {
             MyApplicationTheme(darkTheme = true) {
@@ -63,7 +81,7 @@ class MainActivity : ComponentActivity() {
                     factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return BarStockViewModel(repository) as T
+                            return BarStockViewModel(repository, backupService) as T
                         }
                     }
                 )
@@ -207,6 +225,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 }
 
                 AppScreen.ADMIN_DASHBOARD -> {
+                    val isSyncing by viewModel.isSyncing.collectAsState()
                     AdminDashboardScreen(
                         barProfile = barProfile,
                         counters = allCounters,
@@ -216,6 +235,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         pendingUsers = pendingUsers,
                         reconciliations = allReconciliations,
                         unreadNotificationsCount = unreadNotificationsCount,
+                        isSyncing = isSyncing,
+                        onBackupData = { viewModel.backupData() },
+                        onRestoreData = { viewModel.restoreData() },
                         onNavigate = { screen -> viewModel.navigateTo(screen) },
                         onAddStockAdjustment = { counterId, itemId, qty, reason ->
                             viewModel.addStockAdjustment(counterId, itemId, qty, reason)

@@ -28,8 +28,11 @@ import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.tasks.await
 
 class BarStockRepository(private val dao: BarStockDao) {
+    
 
     // --- Bar Profile ---
     val barProfile: Flow<BarProfile> = dao.getBarProfile().map {
@@ -42,7 +45,9 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     suspend fun saveBarProfile(profile: BarProfile) {
         dao.insertOrUpdateBarProfile(profile)
-    }
+        
+}
+
 
     // --- Users ---
     val allUsers: Flow<List<User>> = dao.getAllUsers()
@@ -54,18 +59,33 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     suspend fun authenticateUser(identifier: String, password: String): User? {
         val user = dao.getUserByIdentifier(identifier.trim())
-        if (user != null && user.password == password.trim()) {
-            return user
+        if (user != null) {
+            if (android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+                try {
+                    FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, password.trim()).await()
+                } catch (e: Exception) {
+                    // Ignore for offline fallback
+                }
+            }
+            if (user.password == password.trim()) {
+                return user
+            }
         }
         return null
     }
 
     suspend fun registerUser(name: String, email: String, phone: String, role: UserRole, password: String = "123456"): Long {
+        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
+        try {
+            if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
+                FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, password).await()
+            }
+        } catch (e: Exception) {}
         val user = User(
             name = name,
             role = role,
             status = if (role == UserRole.ADMIN) UserStatus.APPROVED else UserStatus.PENDING,
-            email = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" },
+            email = finalEmail,
             phone = phone,
             password = password
         )
@@ -82,16 +102,25 @@ class BarStockRepository(private val dao: BarStockDao) {
             )
         }
         return id
-    }
+        
+}
+
 
     suspend fun createAttendantByAdmin(name: String, email: String, phone: String, initialPassword: String): Long {
+        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
+        val pass = initialPassword.ifBlank { "123456" }
+        try {
+            if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
+                FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, pass).await()
+            }
+        } catch (e: Exception) {}
         val user = User(
             name = name,
             role = UserRole.ATTENDANT,
             status = UserStatus.APPROVED,
-            email = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" },
+            email = finalEmail,
             phone = phone,
-            password = initialPassword.ifBlank { "123456" }
+            password = pass
         )
         val id = dao.insertUser(user)
         dao.insertNotification(
@@ -105,7 +134,9 @@ class BarStockRepository(private val dao: BarStockDao) {
             )
         )
         return id
-    }
+        
+}
+
 
     suspend fun changeUserPassword(userId: Long, oldPassword: String?, newPassword: String): Result<Unit> {
         val user = dao.getUserById(userId) ?: return Result.failure(Exception("User not found"))
@@ -117,7 +148,9 @@ class BarStockRepository(private val dao: BarStockDao) {
         }
         dao.updateUserPassword(userId, newPassword)
         return Result.success(Unit)
-    }
+        
+}
+
 
     suspend fun resetPasswordByIdentifier(identifier: String, newPassword: String): Result<User> {
         val trimmed = identifier.trim()
@@ -128,15 +161,23 @@ class BarStockRepository(private val dao: BarStockDao) {
         }
         dao.updateUserPassword(user.id, newPassword)
         return Result.success(user)
-    }
+        
+}
+
 
     suspend fun resetPasswordByPhone(phone: String, newPassword: String): Result<User> {
         return resetPasswordByIdentifier(phone, newPassword)
-    }
+        
+}
+
+
+    suspend fun getUserByPhone(phone: String): User? = dao.getUserByIdentifier(phone.trim())
 
     suspend fun deleteUser(userId: Long) {
         dao.deleteUser(userId)
-    }
+        
+}
+
 
     suspend fun updateUserStatus(userId: Long, newStatus: UserStatus) {
         val user = dao.getUserById(userId)
@@ -163,7 +204,9 @@ class BarStockRepository(private val dao: BarStockDao) {
                 )
             )
         }
-    }
+        
+}
+
 
     // --- Items & Catalog ---
     val allItems: Flow<List<Item>> = dao.getAllItems()
@@ -188,8 +231,8 @@ class BarStockRepository(private val dao: BarStockDao) {
         )
     }
 
-    suspend fun updateItem(item: Item) = dao.updateItem(item)
-    suspend fun deleteItem(itemId: Long) = dao.deleteItem(itemId)
+    suspend fun updateItem(item: Item) = dao.updateItem(item).also {  }
+    suspend fun deleteItem(itemId: Long) = dao.deleteItem(itemId).also {  }
 
     // --- Counters & Inventory ---
     val allCounters: Flow<List<Counter>> = dao.getAllCounters()
@@ -199,10 +242,12 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     suspend fun addCounter(name: String, location: String): Long {
         return dao.insertCounter(Counter(name = name, location = location))
-    }
+        
+}
 
-    suspend fun updateCounter(counter: Counter) = dao.updateCounter(counter)
-    suspend fun deleteCounter(counterId: Long) = dao.deleteCounter(counterId)
+
+    suspend fun updateCounter(counter: Counter) = dao.updateCounter(counter).also {  }
+    suspend fun deleteCounter(counterId: Long) = dao.deleteCounter(counterId).also {  }
 
     fun getCounterStocksWithItems(counterId: Long): Flow<List<CounterStockWithItem>> =
         dao.getCounterStocksWithItems(counterId)
@@ -216,11 +261,15 @@ class BarStockRepository(private val dao: BarStockDao) {
                 minThreshold = minThreshold
             )
         )
-    }
+        
+}
+
 
     suspend fun removeCounterStock(counterId: Long, itemId: Long) {
         dao.deleteCounterStock(counterId, itemId)
-    }
+        
+}
+
 
     // --- Shift Lifecycle & Handover ---
     val allShifts: Flow<List<Shift>> = dao.getAllShifts()
@@ -417,7 +466,9 @@ class BarStockRepository(private val dao: BarStockDao) {
         // We'll update via query / direct find
         // Note: For simplicity, we create helper in DAO or update directly
         // Let's get list from flow or add direct query
-    }
+        
+}
+
 
     suspend fun confirmStockAdjustment(adjustment: StockAdjustment) {
         val updated = adjustment.copy(
@@ -448,7 +499,9 @@ class BarStockRepository(private val dao: BarStockDao) {
                 message = "Attendant confirmed ${adjustment.qtyAddedOrRemoved} units of ${adjustment.itemName} at ${adjustment.counterName}."
             )
         )
-    }
+        
+}
+
 
     suspend fun disputeStockAdjustment(adjustment: StockAdjustment, attendantName: String) {
         val updated = adjustment.copy(
@@ -484,7 +537,9 @@ class BarStockRepository(private val dao: BarStockDao) {
                 relatedId = disputeId
             )
         )
-    }
+        
+}
+
 
     // --- Shift Ending & Reconciliation Computation ---
     data class ClosingItemInput(
@@ -702,8 +757,8 @@ class BarStockRepository(private val dao: BarStockDao) {
     fun getNotificationsForUser(userId: Long, userRole: UserRole): Flow<List<AppNotification>> =
         dao.getNotificationsForUser(userId, userRole)
 
-    suspend fun markNotificationAsRead(id: Long) = dao.markNotificationAsRead(id)
-    suspend fun markAllNotificationsAsRead() = dao.markAllNotificationsAsRead()
+    suspend fun markNotificationAsRead(id: Long) = dao.markNotificationAsRead(id).also {  }
+    suspend fun markAllNotificationsAsRead() = dao.markAllNotificationsAsRead().also {  }
 
     fun getShiftVerifications(shiftId: Long): Flow<List<StockVerification>> =
         dao.getStockVerificationsForShift(shiftId)

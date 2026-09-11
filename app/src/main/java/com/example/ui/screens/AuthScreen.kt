@@ -58,6 +58,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,7 +95,8 @@ import com.example.ui.theme.EmeraldGreen
 enum class AuthMode {
     LOGIN,
     REGISTER_BAR,
-    RESET_PASSWORD
+    RESET_PASSWORD,
+    PHONE_AUTH
 }
 
 @Composable
@@ -104,7 +113,9 @@ fun AuthScreen(
         email: String,
         password: String
     ) -> Unit,
-    onSelfResetPassword: (identifier: String, newPassword: String) -> Unit
+    onSelfResetPassword: (identifier: String, newPassword: String) -> Unit,
+    phoneAuthManager: com.example.ui.viewmodel.PhoneAuthManager? = null,
+    onLoginPhoneCredential: ((com.google.firebase.auth.PhoneAuthCredential, String) -> Unit)? = null
 ) {
     var authMode by remember { mutableStateOf(AuthMode.LOGIN) }
     val focusManager = LocalFocusManager.current
@@ -199,6 +210,19 @@ fun AuthScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
                     )
                 }
+                AuthMode.PHONE_AUTH -> {
+                    Text(
+                        text = "Phone Sign In",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Verify your number via SMS",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 AuthMode.RESET_PASSWORD -> {
                     Text(
                         text = "Reset Password",
@@ -237,6 +261,7 @@ fun AuthScreen(
                             },
                             onForgotPassword = { authMode = AuthMode.RESET_PASSWORD },
                             onRegisterBar = { authMode = AuthMode.REGISTER_BAR },
+                            onPhoneLogin = { authMode = AuthMode.PHONE_AUTH },
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         )
                     }
@@ -273,7 +298,15 @@ fun AuthScreen(
                         )
                     }
 
-                    AuthMode.RESET_PASSWORD -> {
+                    AuthMode.PHONE_AUTH -> {
+                        PhoneAuthContent(
+                            phoneAuthManager = phoneAuthManager,
+                            onLoginPhoneCredential = onLoginPhoneCredential,
+                            onBackToLogin = { authMode = AuthMode.LOGIN }
+                        )
+                    }
+
+                AuthMode.RESET_PASSWORD -> {
                         ResetPasswordFormContent(
                             phone = resetPhone,
                             newPassword = resetNewPassword,
@@ -308,6 +341,7 @@ private fun LoginFormContent(
     onSubmit: () -> Unit,
     onForgotPassword: () -> Unit,
     onRegisterBar: () -> Unit,
+    onPhoneLogin: () -> Unit,
     onNext: () -> Unit
 ) {
     Card(
@@ -436,6 +470,26 @@ private fun LoginFormContent(
                 )
             }
 
+            Spacer(modifier = Modifier.height(14.dp))
+            OutlinedButton(
+                onClick = onPhoneLogin,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Sign In with Phone SMS",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
             Spacer(modifier = Modifier.height(18.dp))
 
             HorizontalDivider(
@@ -917,6 +971,155 @@ private fun QuickProfilesContent(
                 Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Back to Standard Login", color = AmberPrimary)
+            }
+        }
+    }
+}
+
+@Composable
+fun PhoneAuthContent(
+    phoneAuthManager: com.example.ui.viewmodel.PhoneAuthManager?,
+    onLoginPhoneCredential: ((com.google.firebase.auth.PhoneAuthCredential, String) -> Unit)?,
+    onBackToLogin: () -> Unit
+) {
+    if (phoneAuthManager == null || onLoginPhoneCredential == null) {
+        Text("Phone Auth Not Available")
+        return
+    }
+    
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    val authState by phoneAuthManager.authState.collectAsState()
+    var phoneNumber by remember { mutableStateOf("") }
+    var verificationCode by remember { mutableStateOf("") }
+    var currentVerificationId by remember { mutableStateOf<String?>(null) }
+    var phoneForCred by remember { mutableStateOf("") }
+
+    LaunchedEffect(authState) {
+        when (val state = authState) {
+            is com.example.ui.viewmodel.PhoneAuthState.CodeSent -> {
+                currentVerificationId = state.verificationId
+                phoneForCred = phoneNumber
+            }
+            is com.example.ui.viewmodel.PhoneAuthState.Success -> {
+                onLoginPhoneCredential(state.credential, phoneForCred)
+            }
+            else -> {}
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp)
+        ) {
+            if (currentVerificationId == null) {
+                OutlinedTextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone Number") },
+                    placeholder = { Text("+1234567890") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Phone,
+                            contentDescription = null,
+                            tint = if (phoneNumber.isNotEmpty()) AmberPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AmberPrimary,
+                        focusedLabelColor = AmberPrimary,
+                        cursorColor = AmberPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = { 
+                        if (activity != null) phoneAuthManager.sendCode(phoneNumber, activity) 
+                    },
+                    enabled = phoneNumber.isNotBlank() && authState !is com.example.ui.viewmodel.PhoneAuthState.Loading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AmberPrimary,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    if (authState is com.example.ui.viewmodel.PhoneAuthState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Black, strokeWidth = 2.dp)
+                    } else {
+                        Text("Send SMS Code", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = verificationCode,
+                    onValueChange = { verificationCode = it },
+                    label = { Text("6-Digit Code") },
+                    placeholder = { Text("123456") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AmberPrimary,
+                        focusedLabelColor = AmberPrimary,
+                        cursorColor = AmberPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = { 
+                        phoneAuthManager.verifyCode(currentVerificationId!!, verificationCode) 
+                    },
+                    enabled = verificationCode.length >= 6 && authState !is com.example.ui.viewmodel.PhoneAuthState.Loading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AmberPrimary,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) {
+                    if (authState is com.example.ui.viewmodel.PhoneAuthState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.Black, strokeWidth = 2.dp)
+                    } else {
+                        Text("Verify & Sign In", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            }
+
+            if (authState is com.example.ui.viewmodel.PhoneAuthState.Error) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = (authState as com.example.ui.viewmodel.PhoneAuthState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextButton(
+                onClick = {
+                    phoneAuthManager.reset()
+                    currentVerificationId = null
+                    onBackToLogin()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Back to Login", fontWeight = FontWeight.SemiBold)
             }
         }
     }

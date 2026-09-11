@@ -40,6 +40,9 @@ interface BarStockDao {
     @Query("SELECT * FROM users ORDER BY name ASC")
     fun getAllUsers(): Flow<List<User>>
 
+    @Query("SELECT * FROM users")
+    suspend fun getAllUsersSync(): List<User>
+
     @Query("SELECT * FROM users WHERE status = :status ORDER BY createdAt DESC")
     fun getUsersByStatus(status: UserStatus): Flow<List<User>>
 
@@ -77,6 +80,9 @@ interface BarStockDao {
     @Query("SELECT * FROM items ORDER BY category ASC, name ASC")
     fun getAllItems(): Flow<List<Item>>
 
+    @Query("SELECT * FROM items")
+    suspend fun getAllItemsSync(): List<Item>
+
     @Query("SELECT * FROM items WHERE id = :itemId LIMIT 1")
     suspend fun getItemById(itemId: Long): Item?
 
@@ -92,6 +98,9 @@ interface BarStockDao {
     // --- Counters ---
     @Query("SELECT * FROM counters ORDER BY name ASC")
     fun getAllCounters(): Flow<List<Counter>>
+
+    @Query("SELECT * FROM counters")
+    suspend fun getAllCountersSync(): List<Counter>
 
     @Query("SELECT * FROM counters WHERE id = :counterId LIMIT 1")
     suspend fun getCounterById(counterId: Long): Counter?
@@ -112,6 +121,9 @@ interface BarStockDao {
     suspend fun updateCounterActiveShift(counterId: Long, attendantId: Long?, attendantName: String?, shiftId: Long?)
 
     // --- Counter Stocks ---
+    @Query("SELECT * FROM counter_stocks")
+    suspend fun getAllCounterStocksSync(): List<CounterStock>
+    
     @Query("""
         SELECT cs.id AS stockId, cs.counterId, cs.itemId, i.name AS itemName, 
                i.category, i.unitPrice, i.casePrice, i.unitType, cs.currentQuantity, cs.minThreshold 
@@ -150,6 +162,9 @@ interface BarStockDao {
     // --- Shifts ---
     @Query("SELECT * FROM shifts ORDER BY startTime DESC")
     fun getAllShifts(): Flow<List<Shift>>
+
+    @Query("SELECT * FROM shifts")
+    suspend fun getAllShiftsSync(): List<Shift>
 
     @Query("SELECT * FROM shifts WHERE counterId = :counterId AND status = 'ACTIVE' LIMIT 1")
     suspend fun getActiveShiftForCounter(counterId: Long): Shift?
@@ -202,6 +217,9 @@ interface BarStockDao {
     @Query("SELECT * FROM disputes ORDER BY createdAt DESC")
     fun getAllDisputes(): Flow<List<Dispute>>
 
+    @Query("SELECT * FROM disputes")
+    suspend fun getAllDisputesSync(): List<Dispute>
+
     @Query("SELECT * FROM disputes WHERE status = :status ORDER BY createdAt DESC")
     fun getDisputesByStatus(status: DisputeStatus): Flow<List<Dispute>>
 
@@ -220,6 +238,9 @@ interface BarStockDao {
     // --- Stock Adjustments ---
     @Query("SELECT * FROM stock_adjustments ORDER BY timestamp DESC")
     fun getAllStockAdjustments(): Flow<List<StockAdjustment>>
+
+    @Query("SELECT * FROM stock_adjustments")
+    suspend fun getAllStockAdjustmentsSync(): List<StockAdjustment>
 
     @Query("SELECT * FROM stock_adjustments WHERE counterId = :counterId ORDER BY timestamp DESC")
     fun getAdjustmentsForCounter(counterId: Long): Flow<List<StockAdjustment>>
@@ -243,6 +264,9 @@ interface BarStockDao {
     @Query("SELECT * FROM reconciliations ORDER BY date DESC")
     fun getAllReconciliations(): Flow<List<Reconciliation>>
 
+    @Query("SELECT * FROM reconciliations")
+    suspend fun getAllReconciliationsSync(): List<Reconciliation>
+
     @Query("SELECT * FROM reconciliations WHERE attendantId = :attendantId ORDER BY date DESC")
     fun getReconciliationsByAttendant(attendantId: Long): Flow<List<Reconciliation>>
 
@@ -255,6 +279,9 @@ interface BarStockDao {
     // --- Notifications ---
     @Query("SELECT * FROM app_notifications ORDER BY timestamp DESC")
     fun getAllNotifications(): Flow<List<AppNotification>>
+
+    @Query("SELECT * FROM app_notifications")
+    suspend fun getAllNotificationsSync(): List<AppNotification>
 
     @Query("""
         SELECT * FROM app_notifications 
@@ -273,4 +300,43 @@ interface BarStockDao {
 
     @Query("UPDATE app_notifications SET read = 1")
     suspend fun markAllNotificationsAsRead()
+
+    @Query("SELECT * FROM stock_verifications")
+    suspend fun getAllStockVerificationsSync(): List<StockVerification>
+
+    @Query("SELECT * FROM shift_closings")
+    suspend fun getAllShiftClosingsSync(): List<ShiftClosing>
+
+    @Query("DELETE FROM users")
+    suspend fun clearUsers()
+    
+    @Query("DELETE FROM items")
+    suspend fun clearItems()
+    
+    @Query("DELETE FROM counters")
+    suspend fun clearCounters()
+    
+    @Query("DELETE FROM counter_stocks")
+    suspend fun clearCounterStocks()
+    
+    @Query("DELETE FROM shifts")
+    suspend fun clearShifts()
+    
+    @Query("DELETE FROM stock_verifications")
+    suspend fun clearStockVerifications()
+    
+    @Query("DELETE FROM shift_closings")
+    suspend fun clearShiftClosings()
+    
+    @Query("DELETE FROM disputes")
+    suspend fun clearDisputes()
+    
+    @Query("DELETE FROM stock_adjustments")
+    suspend fun clearStockAdjustments()
+    
+    @Query("DELETE FROM reconciliations")
+    suspend fun clearReconciliations()
+    
+    @Query("DELETE FROM app_notifications")
+    suspend fun clearNotifications()
 }

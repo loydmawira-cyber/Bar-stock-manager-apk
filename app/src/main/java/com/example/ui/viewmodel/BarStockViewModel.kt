@@ -1,6 +1,9 @@
 package com.example.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AdjustmentStatus
 import com.example.data.model.AppNotification
@@ -19,6 +22,7 @@ import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
 import com.example.data.repository.BarStockRepository
+import com.example.data.repository.BackupService
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -75,7 +79,10 @@ data class ClosingCountState(
     val expectedAmount: Double get() = unitsSold * unitPrice
 }
 
-class BarStockViewModel(private val repository: BarStockRepository) : ViewModel() {
+class BarStockViewModel(
+    private val repository: BarStockRepository,
+    private val backupService: BackupService
+) : ViewModel() {
 
     private val _currentScreen = MutableStateFlow(AppScreen.AUTH)
     val currentScreen: StateFlow<AppScreen> = _currentScreen.asStateFlow()
@@ -202,6 +209,24 @@ class BarStockViewModel(private val repository: BarStockRepository) : ViewModel(
         }
     }
 
+    val phoneAuthManager = PhoneAuthManager()
+
+    fun loginWithPhoneCredential(credential: PhoneAuthCredential, phone: String) {
+        viewModelScope.launch {
+            try {
+                FirebaseAuth.getInstance().signInWithCredential(credential).await()
+                val localUser = repository.getUserByPhone(phone)
+                if (localUser != null) {
+                    loginUser(localUser)
+                } else {
+                    _toastMessage.emit("Phone verified, but no local account found.")
+                }
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Phone sign-in failed")
+            }
+        }
+    }
+
     fun loginWithCredentials(identifier: String, password: String) {
         viewModelScope.launch {
             if (identifier.isBlank() || password.isBlank()) {
@@ -214,6 +239,39 @@ class BarStockViewModel(private val repository: BarStockRepository) : ViewModel(
                 return@launch
             }
             loginUser(user)
+        }
+    }
+
+    // --- Backup & Restore ---
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    fun backupData() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            val result = backupService.backupData("backup_default")
+            if (result.isSuccess) {
+                _toastMessage.emit("Backup to cloud successful!")
+            } else {
+                _toastMessage.emit("Backup failed: ${result.exceptionOrNull()?.message}")
+            }
+            _isSyncing.value = false
+        }
+    }
+
+    fun restoreData() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            val result = backupService.restoreData("backup_default")
+            if (result.isSuccess) {
+                _toastMessage.emit("Data restored successfully!")
+                // Optionally reload or navigate
+                _currentScreen.value = AppScreen.AUTH
+                _currentUser.value = null
+            } else {
+                _toastMessage.emit("Restore failed: ${result.exceptionOrNull()?.message}")
+            }
+            _isSyncing.value = false
         }
     }
 
