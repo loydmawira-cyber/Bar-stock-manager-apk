@@ -4,6 +4,7 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class BackupData(
+    val barProfile: BarProfile? = null,
     val users: List<User> = emptyList(),
     val items: List<Item> = emptyList(),
     val counters: List<Counter> = emptyList(),
