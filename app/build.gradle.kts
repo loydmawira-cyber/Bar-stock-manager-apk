@@ -20,8 +20,9 @@ android {
 
     // Keep applicationId unchanged so this APK updates the installed app.
     // Increase versionCode for every release update.
-    versionCode = 4
-    versionName = "1.3"
+    val dynamicVersionCode = providers.gradleProperty("VERSION_CODE").orNull?.toIntOrNull() ?: 5
+    versionCode = dynamicVersionCode
+    versionName = "1.4"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
