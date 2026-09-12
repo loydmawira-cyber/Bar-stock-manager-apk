@@ -237,6 +237,14 @@ class BarStockViewModel(
                 _toastMessage.emit("Please enter your email/phone and password.")
                 return@launch
             }
+            // A newly installed app has an empty local database. Restore the
+            // tenant snapshot before checking credentials, otherwise every
+            // cloud-created user appears to have invalid credentials.
+            val syncResult = backupService.syncData()
+            if (syncResult.isFailure) {
+                _toastMessage.emit("Unable to sync accounts. Check your internet connection and try again.")
+                return@launch
+            }
             val user = repository.authenticateUser(identifier, password)
             if (user == null) {
                 _toastMessage.emit("Invalid login credentials. Please check your password.")
