@@ -95,6 +95,7 @@ fun AttendantDashboardScreen(
     unreadNotificationsCount: Int = 0,
     onSelectCounterForShift: (Counter) -> Unit,
     onResumeActiveShift: () -> Unit,
+    onViewShiftReceipt: (Shift) -> Unit = {},
     onChangePassword: (oldPass: String, newPass: String) -> Unit,
     onNavigate: (AppScreen) -> Unit
 ) {
@@ -524,7 +525,9 @@ fun AttendantDashboardScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onViewShiftReceipt(shift) }
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
@@ -549,18 +552,28 @@ fun AttendantDashboardScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "Sales: ${formatCurrency(shift.totalSubmittedCash)}",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = formatDateTime(shift.startTime),
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = formatDateTime(shift.startTime),
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Receipt >",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberPrimary
+                                )
+                            }
                         }
                     }
                 }

@@ -184,7 +184,6 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     onNotificationClick = { viewModel.navigateTo(AppScreen.NOTIFICATIONS) },
                     onBarProfileClick = { viewModel.navigateTo(AppScreen.BAR_PROFILE) },
                     onChangePasswordClick = { showPasswordDialog = true },
-                    onSwitchUser = { user -> viewModel.loginUser(user) },
                     onLogout = { viewModel.logout() }
                 )
             }
@@ -238,6 +237,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         unreadNotificationsCount = unreadNotificationsCount,
                         isSyncing = isSyncing,
                         onNavigate = { screen -> viewModel.navigateTo(screen) },
+                        onViewShiftReceipt = { shift -> viewModel.viewShiftReceipt(shift) },
                         onAddStockAdjustment = { counterId, itemId, qty, reason ->
                             viewModel.addStockAdjustment(counterId, itemId, qty, reason)
                         },
@@ -278,6 +278,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             },
                             onChangePassword = { oldPass, newPass ->
                                 viewModel.changePassword(user.id, oldPass, newPass)
+                            },
+                            onViewShiftReceipt = { shift ->
+                                viewModel.viewShiftReceipt(shift)
                             },
                             onNavigate = { screen -> viewModel.navigateTo(screen) }
                         )
@@ -374,6 +377,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             reconciliations = allReconciliations,
                             attendants = attendants,
                             selectedAttendantId = selectedAttendantFilterId,
+                            onViewShiftReceipt = { shiftId ->
+                                viewModel.viewShiftReceiptById(shiftId)
+                            },
                             onSelectAttendantFilter = { id ->
                                 viewModel.setAttendantLedgerFilter(id)
                             }

@@ -35,6 +35,7 @@ android {
 
       storePassword = System.getenv("STORE_PASSWORD")
         ?: providers.gradleProperty("STORE_PASSWORD").orNull
+        ?: "android"
 
       keyAlias = System.getenv("KEY_ALIAS")
         ?: providers.gradleProperty("KEY_ALIAS").orNull
@@ -42,6 +43,7 @@ android {
 
       keyPassword = System.getenv("KEY_PASSWORD")
         ?: providers.gradleProperty("KEY_PASSWORD").orNull
+        ?: "android"
     }
 
     create("debugConfig") {

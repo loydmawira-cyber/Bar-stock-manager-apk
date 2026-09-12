@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -343,11 +344,17 @@ fun CounterManagementScreen(
                                 }
 
                                 Button(
-                                    onClick = { onRestockClick(counter) },
+                                    onClick = {
+                                        selectedItemForAssign = counterStocks.firstOrNull()?.let { s -> allItems.find { it.id == s.itemId } } ?: allItems.firstOrNull()
+                                        assignInitialQtyText = ""
+                                        showAssignItemDialog = true
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
+                                    Icon(Icons.Filled.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text("Restock Units", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -415,16 +422,41 @@ fun CounterManagementScreen(
                                 )
                             }
 
-                            Surface(
-                                color = DarkSurfaceVariant,
-                                shape = RoundedCornerShape(8.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                Surface(
+                                    color = DarkSurfaceVariant,
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("On Shelf", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${stock.currentQuantity}", fontSize = 16.sp, fontWeight = FontWeight.Black, color = AmberPrimary)
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text("On Shelf", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${stock.currentQuantity}", fontSize = 16.sp, fontWeight = FontWeight.Black, color = AmberPrimary)
+                                    }
+                                }
+
+                                if (currentUser?.role == UserRole.ADMIN) {
+                                    IconButton(
+                                        onClick = {
+                                            selectedItemForAssign = allItems.find { it.id == stock.itemId }
+                                            assignInitialQtyText = ""
+                                            showAssignItemDialog = true
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(EmeraldGreen.copy(alpha = 0.2f), CircleShape)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Add,
+                                            contentDescription = "Add Stock",
+                                            tint = EmeraldGreen,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -557,11 +589,21 @@ fun CounterManagementScreen(
         )
     }
 
-    // Assign Item to Counter Dialog
+    // Assign / Add Stock to Counter Dialog
     if (showAssignItemDialog && activeCounter != null) {
+        val existingStock = counterStocks.find { it.itemId == selectedItemForAssign?.id }
+        val currentExistingQty = existingStock?.currentQuantity ?: 0
+        val qtyToAdd = assignInitialQtyText.toIntOrNull() ?: 0
+        val projectedTotal = currentExistingQty + maxOf(0, qtyToAdd)
+
         AlertDialog(
             onDismissRequest = { showAssignItemDialog = false },
-            title = { Text("Assign Item to ${activeCounter.name}", fontWeight = FontWeight.Bold) },
+            title = {
+                Text(
+                    text = if (existingStock != null) "Add Stock to ${activeCounter.name}" else "Assign Item to ${activeCounter.name}",
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ExposedDropdownMenuBox(
@@ -569,7 +611,7 @@ fun CounterManagementScreen(
                         onExpandedChange = { expandedItemMenu = it }
                     ) {
                         OutlinedTextField(
-                            value = selectedItemForAssign?.name ?: "Select Item",
+                            value = selectedItemForAssign?.let { "${it.name} (${it.category.name})" } ?: "Select Item",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Alcohol / Beverage") },
@@ -583,8 +625,23 @@ fun CounterManagementScreen(
                             onDismissRequest = { expandedItemMenu = false }
                         ) {
                             allItems.forEach { itm ->
+                                val inStock = counterStocks.find { it.itemId == itm.id }
                                 DropdownMenuItem(
-                                    text = { Text("${itm.name} (${itm.category.name}) - ${formatCurrency(itm.unitPrice)}") },
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(itm.name)
+                                            Text(
+                                                text = if (inStock != null) "Current: ${inStock.currentQuantity}" else "New",
+                                                color = if (inStock != null) AmberPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    },
                                     onClick = {
                                         selectedItemForAssign = itm
                                         expandedItemMenu = false
@@ -594,10 +651,44 @@ fun CounterManagementScreen(
                         }
                     }
 
+                    // Visual breakdown of Existing + Added = Adjusted Total
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Existing Stock", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$currentExistingQty", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Adding", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${maxOf(0, qtyToAdd)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = EmeraldGreen)
+                            }
+                            Text("=", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Adjusted Total", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("$projectedTotal", fontSize = 16.sp, fontWeight = FontWeight.Black, color = AmberPrimary)
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = assignInitialQtyText,
                         onValueChange = { assignInitialQtyText = it },
-                        label = { Text("Initial Stock Quantity") },
+                        label = { Text("Quantity to Add (+ Units)") },
+                        placeholder = { Text("e.g. 10 or 24") },
+                        supportingText = {
+                            Text("Adjusts stock: $currentExistingQty existing + ${maxOf(0, qtyToAdd)} added = $projectedTotal total units")
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -613,11 +704,16 @@ fun CounterManagementScreen(
                         if (item != null && qty > 0) {
                             onAssignItemToCounter(activeCounter.id, item.id, qty)
                             showAssignItemDialog = false
+                            assignInitialQtyText = ""
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
                 ) {
-                    Text("Assign Stock", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (existingStock != null) "Add Stock ($currentExistingQty + $qtyToAdd = $projectedTotal)" else "Assign Stock ($qtyToAdd Units)",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {

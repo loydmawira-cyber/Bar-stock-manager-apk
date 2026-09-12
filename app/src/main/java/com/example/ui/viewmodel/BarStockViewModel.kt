@@ -666,7 +666,7 @@ class BarStockViewModel(
                 )
             }
 
-            val closedShift = repository.closeShiftAndReconcile(
+            val (closedShift, closings) = repository.closeShiftAndReconcile(
                 shiftId = shift.id,
                 submittedCash = submittedCash,
                 closingInputs = inputs,
@@ -674,25 +674,29 @@ class BarStockViewModel(
             )
 
             _lastClosedShift.value = closedShift
-            _lastShiftClosings.value = repository.getOpeningAndAdjustmentDataForClosing(shift.id, shift.counterId).map {
-                ShiftClosing(
-                    shiftId = shift.id,
-                    itemId = it.itemId,
-                    itemName = it.itemName,
-                    category = it.category,
-                    unitType = it.unitType,
-                    unitPrice = it.unitPrice,
-                    openingQty = it.openingQty,
-                    adjustmentsQty = it.adjustmentQty,
-                    effectiveOpeningQty = it.effectiveOpening,
-                    closingQty = it.closingQty,
-                    unitsSold = it.unitsSold,
-                    expectedAmount = it.expectedAmount
-                )
-            }
+            _lastShiftClosings.value = closings
 
             _toastMessage.emit("Shift closed successfully and reconciled.")
             _currentScreen.value = AppScreen.SHIFT_SUMMARY
+        }
+    }
+
+    fun viewShiftReceipt(shift: Shift) {
+        viewModelScope.launch {
+            _lastClosedShift.value = shift
+            _lastShiftClosings.value = repository.getShiftClosings(shift.id)
+            _currentScreen.value = AppScreen.SHIFT_SUMMARY
+        }
+    }
+
+    fun viewShiftReceiptById(shiftId: Long) {
+        viewModelScope.launch {
+            val shift = repository.getShiftById(shiftId)
+            if (shift != null) {
+                _lastClosedShift.value = shift
+                _lastShiftClosings.value = repository.getShiftClosings(shift.id)
+                _currentScreen.value = AppScreen.SHIFT_SUMMARY
+            }
         }
     }
 
@@ -793,7 +797,7 @@ class BarStockViewModel(
     fun assignItemToCounter(counterId: Long, itemId: Long, initialQty: Int) {
         viewModelScope.launch {
             repository.setCounterItemStock(counterId, itemId, initialQty)
-            _toastMessage.emit("Item assigned to counter with $initialQty units.")
+            _toastMessage.emit("Added $initialQty units to counter stock.")
         }
     }
 

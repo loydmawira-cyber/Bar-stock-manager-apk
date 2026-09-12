@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,7 @@ import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
+import com.example.ui.theme.SkyBlue
 import java.util.Locale
 
 @Composable
@@ -183,60 +185,269 @@ fun ShiftSummaryScreen(
         }
 
         // Itemized Sales Breakdown
+        val totalUnitsSold = closings.sumOf { it.unitsSold }
+        val totalGrossCalculated = closings.sumOf { it.expectedAmount }
+
         item {
-            Text(
-                text = "ITEMIZED SALES BREAKDOWN",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                letterSpacing = 1.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ITEMIZED SALES BREAKDOWN (${closings.size} Items)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp
+                )
+
+                Text(
+                    text = "$totalUnitsSold units sold",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AmberPrimary
+                )
+            }
         }
 
-        items(closings) { closing ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        if (closings.isEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CategoryBadge(category = closing.category)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = closing.itemName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            text = "Opening: ${closing.openingQty}${if (closing.adjustmentsQty != 0) " (+${closing.adjustmentsQty})" else ""} | Closing: ${closing.closingQty} | Sold: ${closing.unitsSold}",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = formatCurrency(closing.expectedAmount),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = EmeraldGreen
-                        )
-                        Text(
-                            text = "@ ${formatCurrency(closing.unitPrice)}",
-                            fontSize = 11.sp,
+                            text = "Itemized inventory closing records not found for this shift.",
+                            fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Total Expected Sales: ${formatCurrency(shift.totalExpectedSales)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldGreen
+                        )
+                    }
+                }
+            }
+        } else {
+            items(closings) { closing ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Header: Category, Item Name, and Unit Price
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                CategoryBadge(category = closing.category)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = closing.itemName,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Surface(
+                                color = DarkSurfaceVariant,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "${formatCurrency(closing.unitPrice)} / ${closing.unitType}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Stock Reconciliation Tally: Opening + Adjustments = Total Avail - Closing = Sold
+                        Surface(
+                            color = MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Opening", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${closing.openingQty}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                }
+
+                                if (closing.adjustmentsQty != 0) {
+                                    Text("+", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Restocked", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(
+                                            text = if (closing.adjustmentsQty > 0) "+${closing.adjustmentsQty}" else "${closing.adjustmentsQty}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (closing.adjustmentsQty > 0) EmeraldGreen else CrimsonRed
+                                        )
+                                    }
+                                }
+
+                                Text("=", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Total Avail", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${closing.effectiveOpeningQty}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                }
+
+                                Text("-", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Closing Left", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("${closing.closingQty}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                                }
+
+                                Text("=", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Units Sold", fontSize = 10.sp, color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                    Text("${closing.unitsSold}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = EmeraldGreen)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Clear Prominent Item Total Card
+                        Surface(
+                            color = if (closing.unitsSold > 0) EmeraldGreen.copy(alpha = 0.12f) else DarkSurfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "ITEM SALES TOTAL",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Text(
+                                        text = "${closing.unitsSold} sold × ${formatCurrency(closing.unitPrice)}",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Text(
+                                    text = formatCurrency(closing.expectedAmount),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (closing.unitsSold > 0) EmeraldGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sales Totals Recap Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "SHIFT SALES RECAP",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AmberPrimary,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Beverage Lines", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${closings.size} items", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Total Units Sold", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("$totalUnitsSold units", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Gross Beverage Sales", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(formatCurrency(totalGrossCalculated), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EmeraldGreen)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = DarkSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Attendant Handover Cash", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(formatCurrency(shift.totalSubmittedCash), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Reconciliation Variance", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = "${if (shift.variance > 0) "+" else ""}${formatCurrency(shift.variance)} (${shift.reconciliationType.name})",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (shift.reconciliationType) {
+                                    ReconciliationType.LOSS -> CrimsonRed
+                                    ReconciliationType.EXTRA -> SkyBlue
+                                    ReconciliationType.BALANCED -> EmeraldGreen
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -16,12 +16,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Store
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.ExitToApp
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Shield
@@ -65,7 +65,7 @@ fun BarAppTopBar(
     title: String,
     barProfile: BarProfile,
     currentUser: User?,
-    allUsers: List<User>,
+    allUsers: List<User> = emptyList(),
     unreadCount: Int,
     isSyncing: Boolean,
     currentScreen: AppScreen,
@@ -73,7 +73,6 @@ fun BarAppTopBar(
     onNotificationClick: () -> Unit,
     onBarProfileClick: () -> Unit,
     onChangePasswordClick: () -> Unit,
-    onSwitchUser: (User) -> Unit,
     onLogout: () -> Unit
 ) {
     var showUserMenu by remember { mutableStateOf(false) }
@@ -197,15 +196,15 @@ fun BarAppTopBar(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
-                                imageVector = Icons.Filled.SwapHoriz,
-                                contentDescription = "Switch",
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Menu",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
 
-                    // Dropdown for switching roles / settings / passwords
+                    // Dropdown for settings / passwords / logout
                     DropdownMenu(
                         expanded = showUserMenu,
                         onDismissRequest = { showUserMenu = false },
@@ -245,49 +244,6 @@ fun BarAppTopBar(
                                 )
                             }
                         )
-
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                        Text(
-                            text = "SWITCH PERSONA / ROLE",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-
-                        allUsers.forEach { user ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(
-                                            text = user.name,
-                                            fontWeight = if (user.id == currentUser.id) FontWeight.Bold else FontWeight.Normal,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = "${user.role.name} · ${user.status.name}",
-                                            fontSize = 11.sp,
-                                            color = when (user.role) {
-                                                UserRole.ADMIN -> AmberPrimary
-                                                UserRole.ATTENDANT -> EmeraldGreen
-                                            }
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    showUserMenu = false
-                                    onSwitchUser(user)
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = if (user.role == UserRole.ADMIN) Icons.Outlined.Shield else Icons.Outlined.Person,
-                                        contentDescription = null,
-                                        tint = if (user.role == UserRole.ADMIN) AmberPrimary else EmeraldGreen
-                                    )
-                                }
-                            )
-                        }
 
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 

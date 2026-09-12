@@ -67,6 +67,7 @@ fun LedgerScreen(
     reconciliations: List<Reconciliation>,
     attendants: List<User>,
     selectedAttendantId: Long?,
+    onViewShiftReceipt: (Long) -> Unit = {},
     onSelectAttendantFilter: (Long?) -> Unit
 ) {
     val currency = LocalCurrencySymbol.current
@@ -242,7 +243,9 @@ fun LedgerScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onViewShiftReceipt(recon.shiftId) }
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
@@ -257,11 +260,20 @@ fun LedgerScreen(
                                     fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Text(
-                                    text = formatDateTime(recon.date),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = formatDateTime(recon.date),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "· Receipt >",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AmberPrimary
+                                    )
+                                }
                             }
 
                             ReconciliationBadge(type = recon.type, variance = recon.variance)

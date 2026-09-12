@@ -249,16 +249,52 @@ class BarStockRepository(private val dao: BarStockDao) {
         dao.getCounterStocksWithItems(counterId)
 
     suspend fun setCounterItemStock(counterId: Long, itemId: Long, quantity: Int, minThreshold: Int = 5) {
+        val existing = dao.getCounterStock(counterId, itemId)
+        val current = existing?.currentQuantity ?: 0
+        val newQuantity = current + quantity
+        val stockId = existing?.id ?: 0L
+
         dao.insertCounterStock(
             CounterStock(
+                id = stockId,
                 counterId = counterId,
                 itemId = itemId,
-                currentQuantity = quantity,
-                minThreshold = minThreshold
+                currentQuantity = newQuantity,
+                minThreshold = existing?.minThreshold ?: minThreshold
             )
         )
-        
-}
+
+        val activeShift = dao.getActiveShiftForCounter(counterId)
+        val counter = dao.getCounterById(counterId)
+        val item = dao.getItemById(itemId)
+        if (counter != null && item != null) {
+            val adjustment = StockAdjustment(
+                counterId = counterId,
+                counterName = counter.name,
+                itemId = itemId,
+                itemName = item.name,
+                qtyAddedOrRemoved = quantity,
+                addedByAdminName = "Admin",
+                shiftId = activeShift?.id,
+                attendantConfirmed = true,
+                status = AdjustmentStatus.CONFIRMED,
+                reason = "Stock Addition"
+            )
+            val adjId = dao.insertStockAdjustment(adjustment)
+            if (activeShift != null) {
+                dao.insertNotification(
+                    AppNotification(
+                        targetUserId = activeShift.attendantId,
+                        targetRole = UserRole.ATTENDANT,
+                        type = NotificationType.MID_SHIFT_ADJUSTMENT,
+                        title = "Stock Added: ${item.name}",
+                        message = "Admin added +$quantity units of ${item.name}. Total stock on shelf is now $newQuantity.",
+                        relatedId = adjId
+                    )
+                )
+            }
+        }
+    }
 
 
     suspend fun removeCounterStock(counterId: Long, itemId: Long) {
@@ -272,6 +308,7 @@ class BarStockRepository(private val dao: BarStockDao) {
     fun getShiftsByAttendant(attendantId: Long): Flow<List<Shift>> = dao.getShiftsByAttendant(attendantId)
     fun getActiveShiftForAttendantFlow(attendantId: Long): Flow<Shift?> = dao.getActiveShiftForAttendantFlow(attendantId)
     fun getShiftByIdFlow(shiftId: Long): Flow<Shift?> = dao.getShiftByIdFlow(shiftId)
+    suspend fun getShiftById(shiftId: Long): Shift? = dao.getShiftById(shiftId)
 
     suspend fun canStartShiftAtCounter(counterId: Long): Pair<Boolean, String?> {
         val counter = dao.getCounterById(counterId) ?: return Pair(false, "Counter not found.")
@@ -426,20 +463,21 @@ class BarStockRepository(private val dao: BarStockDao) {
         )
         val id = dao.insertStockAdjustment(adjustment)
 
-        // If no active shift, update the counter stock directly
-        if (activeShift == null) {
-            val stock = dao.getCounterStock(counterId, itemId)
-            val current = stock?.currentQuantity ?: 0
-            val newQty = maxOf(0, current + quantityToAddOrRemove)
-            dao.insertCounterStock(
-                CounterStock(
-                    id = stock?.id ?: 0,
-                    counterId = counterId,
-                    itemId = itemId,
-                    currentQuantity = newQty
-                )
+        // Always update the counter stock directly so both admin and attendant immediately see existing + added stock
+        val stock = dao.getCounterStock(counterId, itemId)
+        val current = stock?.currentQuantity ?: 0
+        val newQty = maxOf(0, current + quantityToAddOrRemove)
+        dao.insertCounterStock(
+            CounterStock(
+                id = stock?.id ?: 0,
+                counterId = counterId,
+                itemId = itemId,
+                currentQuantity = newQty,
+                minThreshold = stock?.minThreshold ?: 5
             )
-        } else {
+        )
+
+        if (activeShift != null) {
             // Notify active attendant
             val actionWord = if (quantityToAddOrRemove > 0) "added (+$quantityToAddOrRemove)" else "removed ($quantityToAddOrRemove)"
             dao.insertNotification(
@@ -448,7 +486,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                     targetRole = UserRole.ATTENDANT,
                     type = NotificationType.MID_SHIFT_ADJUSTMENT,
                     title = "Stock Adjustment: ${item.name}",
-                    message = "Admin $adminName $actionWord units of ${item.name}. Please confirm receipt.",
+                    message = "Admin $adminName $actionWord units of ${item.name}. Total stock is now $newQty. Please confirm receipt.",
                     relatedId = id
                 )
             )
@@ -461,7 +499,6 @@ class BarStockRepository(private val dao: BarStockDao) {
         val adjustments = dao.getAllStockAdjustments()
         // We'll update via query / direct find
         // Note: For simplicity, we create helper in DAO or update directly
-        // Let's get list from flow or add direct query
         
 }
 
@@ -472,19 +509,6 @@ class BarStockRepository(private val dao: BarStockDao) {
             status = AdjustmentStatus.CONFIRMED
         )
         dao.updateStockAdjustment(updated)
-
-        // Update official counter stock
-        val stock = dao.getCounterStock(adjustment.counterId, adjustment.itemId)
-        val current = stock?.currentQuantity ?: 0
-        val newQty = maxOf(0, current + adjustment.qtyAddedOrRemoved)
-        dao.insertCounterStock(
-            CounterStock(
-                id = stock?.id ?: 0,
-                counterId = adjustment.counterId,
-                itemId = adjustment.itemId,
-                currentQuantity = newQty
-            )
-        )
 
         // Notify Admin
         dao.insertNotification(
@@ -505,6 +529,13 @@ class BarStockRepository(private val dao: BarStockDao) {
             status = AdjustmentStatus.DISPUTED
         )
         dao.updateStockAdjustment(updated)
+
+        // Revert the disputed added stock from the counter
+        val stock = dao.getCounterStock(adjustment.counterId, adjustment.itemId)
+        if (stock != null) {
+            val revertedQty = maxOf(0, stock.currentQuantity - adjustment.qtyAddedOrRemoved)
+            dao.insertCounterStock(stock.copy(currentQuantity = revertedQty))
+        }
 
         // Create dispute record
         val disputeId = dao.insertDispute(
@@ -577,7 +608,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         submittedCash: Double,
         closingInputs: List<ClosingItemInput>,
         closingNotes: String = ""
-    ): Shift {
+    ): Pair<Shift, List<ShiftClosing>> {
         val shift = dao.getShiftById(shiftId) ?: throw IllegalStateException("Shift not found")
         val counter = dao.getCounterById(shift.counterId)
 
@@ -685,7 +716,11 @@ class BarStockRepository(private val dao: BarStockDao) {
             )
         )
 
-        return updatedShift
+        return Pair(updatedShift, closingEntities)
+    }
+
+    suspend fun getShiftClosings(shiftId: Long): List<ShiftClosing> {
+        return dao.getShiftClosingsForShiftSync(shiftId)
     }
 
     // --- Disputes ---
@@ -759,6 +794,6 @@ class BarStockRepository(private val dao: BarStockDao) {
     fun getShiftVerifications(shiftId: Long): Flow<List<StockVerification>> =
         dao.getStockVerificationsForShift(shiftId)
 
-    fun getShiftClosings(shiftId: Long): Flow<List<ShiftClosing>> =
+    fun getShiftClosingsFlow(shiftId: Long): Flow<List<ShiftClosing>> =
         dao.getShiftClosingsForShift(shiftId)
 }

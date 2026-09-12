@@ -343,6 +343,68 @@ abstract class BarStockDatabase : RoomDatabase() {
                 )
             )
 
+            // Seed Itemized Closings for prevShiftId with accurate item totals
+            dao.insertShiftClosings(
+                listOf(
+                    ShiftClosing(
+                        shiftId = prevShiftId,
+                        itemId = itemTusker,
+                        itemName = "Tusker Lager 500ml",
+                        category = ItemCategory.BEER,
+                        unitType = "Bottle",
+                        unitPrice = 300.00,
+                        openingQty = 48,
+                        adjustmentsQty = 0,
+                        effectiveOpeningQty = 48,
+                        closingQty = 20,
+                        unitsSold = 28,
+                        expectedAmount = 8400.00
+                    ),
+                    ShiftClosing(
+                        shiftId = prevShiftId,
+                        itemId = itemTuskerMalt,
+                        itemName = "Tusker Malt 330ml",
+                        category = ItemCategory.BEER,
+                        unitType = "Bottle",
+                        unitPrice = 350.00,
+                        openingQty = 36,
+                        adjustmentsQty = 0,
+                        effectiveOpeningQty = 36,
+                        closingQty = 12,
+                        unitsSold = 24,
+                        expectedAmount = 8400.00
+                    ),
+                    ShiftClosing(
+                        shiftId = prevShiftId,
+                        itemId = itemWhiteCap,
+                        itemName = "White Cap Crisp 500ml",
+                        category = ItemCategory.BEER,
+                        unitType = "Bottle",
+                        unitPrice = 320.00,
+                        openingQty = 30,
+                        adjustmentsQty = 0,
+                        effectiveOpeningQty = 30,
+                        closingQty = 15,
+                        unitsSold = 15,
+                        expectedAmount = 4800.00
+                    ),
+                    ShiftClosing(
+                        shiftId = prevShiftId,
+                        itemId = itemGuinness,
+                        itemName = "Guinness FES 500ml",
+                        category = ItemCategory.BEER,
+                        unitType = "Bottle",
+                        unitPrice = 350.00,
+                        openingQty = 24,
+                        adjustmentsQty = 0,
+                        effectiveOpeningQty = 24,
+                        closingQty = 16,
+                        unitsSold = 8,
+                        expectedAmount = 2800.00
+                    )
+                )
+            )
+
             dao.insertReconciliation(
                 Reconciliation(
                     shiftId = prevShiftId,

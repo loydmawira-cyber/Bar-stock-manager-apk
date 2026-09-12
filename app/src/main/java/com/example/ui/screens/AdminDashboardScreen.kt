@@ -108,6 +108,7 @@ fun AdminDashboardScreen(
     unreadNotificationsCount: Int = 0,
     isSyncing: Boolean = false,
     onNavigate: (AppScreen) -> Unit,
+    onViewShiftReceipt: (Shift) -> Unit = {},
     onAddStockAdjustment: (counterId: Long, itemId: Long, qty: Int, reason: String) -> Unit,
     onSelectCounterForManagement: (Long) -> Unit
 ) {
@@ -428,7 +429,11 @@ fun AdminDashboardScreen(
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = shift.status == com.example.data.model.ShiftStatus.CLOSED) {
+                        onViewShiftReceipt(shift)
+                    }
             ) {
                 Row(
                     modifier = Modifier
@@ -449,11 +454,22 @@ fun AdminDashboardScreen(
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = formatDateTime(shift.startTime),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = formatDateTime(shift.startTime),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (shift.status == com.example.data.model.ShiftStatus.CLOSED) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "· View Receipt >",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AmberPrimary
+                                )
+                            }
+                        }
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
@@ -555,6 +571,9 @@ fun AdminDashboardScreen(
                         value = restockQtyText,
                         onValueChange = { restockQtyText = it },
                         label = { Text("Quantity Added (+/-)") },
+                        supportingText = {
+                            Text("Adds to existing counter stock (Existing + Added = New Total)")
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("restock_qty_input"),
