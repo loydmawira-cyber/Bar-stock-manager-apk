@@ -242,17 +242,21 @@ class BarStockViewModel(
                 _toastMessage.emit("Please enter your email/phone and password.")
                 return@launch
             }
-            // A newly installed app has an empty local database. Restore the
-            // tenant snapshot before checking credentials, otherwise every
-            // cloud-created user appears to have invalid credentials.
-            val syncResult = backupService.syncData()
-            if (syncResult.isFailure) {
-                _toastMessage.emit("Unable to sync accounts. Check your internet connection and try again.")
+            val user = try {
+                repository.authenticateUser(identifier, password)
+            } catch (e: Exception) {
+                _toastMessage.emit("Firebase login failed: ${e.message ?: "check the account and password"}")
                 return@launch
             }
-            val user = repository.authenticateUser(identifier, password)
             if (user == null) {
                 _toastMessage.emit("Invalid login credentials. Please check your password.")
+                return@launch
+            }
+            // Authenticate first: repository login establishes Firebase Auth
+            // for email accounts, which Firestore rules require for sync.
+            val syncResult = backupService.syncData()
+            if (syncResult.isFailure) {
+                _toastMessage.emit("Login succeeded, but cloud sync failed. Check Firestore rules and try again.")
                 return@launch
             }
             loginUser(user)
