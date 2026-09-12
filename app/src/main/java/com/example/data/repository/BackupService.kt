@@ -8,12 +8,19 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.tasks.await
 
 class BackupService(private val dao: BarStockDao) {
-    private val firestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore? by lazy {
+        try {
+            FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            null
+        }
+    }
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val adapter = moshi.adapter(BackupData::class.java)
 
     suspend fun backupData(backupId: String = "default_bar"): Result<Unit> {
         return try {
+            val db = firestore ?: return Result.failure(Exception("Firebase not initialized"))
             val data = BackupData(
                 users = dao.getAllUsersSync(),
                 items = dao.getAllItemsSync(),
@@ -37,7 +44,7 @@ class BackupService(private val dao: BarStockDao) {
                 "data" to json
             )
 
-            firestore.collection("backups").document(backupId).set(document).await()
+            db.collection("backups").document(backupId).set(document).await()
             Result.success(Unit)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -47,7 +54,8 @@ class BackupService(private val dao: BarStockDao) {
 
     suspend fun restoreData(backupId: String = "default_bar"): Result<Unit> {
         return try {
-            val snapshot = firestore.collection("backups").document(backupId).get().await()
+            val db = firestore ?: return Result.failure(Exception("Firebase not initialized"))
+            val snapshot = db.collection("backups").document(backupId).get().await()
             if (!snapshot.exists()) {
                 return Result.failure(Exception("No backup found in cloud."))
             }
