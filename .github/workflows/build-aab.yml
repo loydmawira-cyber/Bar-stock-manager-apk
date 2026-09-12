@@ -13,6 +13,7 @@ jobs:
     env:
       STORE_PASSWORD: android123
       KEY_PASSWORD: android123
+      KEY_ALIAS: upload
       KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
 
     steps:
@@ -37,7 +38,7 @@ jobs:
             -keystore "$KEYSTORE_PATH" \
             -storepass "$STORE_PASSWORD" \
             -keypass "$KEY_PASSWORD" \
-            -alias upload \
+            -alias "$KEY_ALIAS" \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
