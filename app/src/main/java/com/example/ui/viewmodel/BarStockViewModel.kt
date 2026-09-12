@@ -85,7 +85,7 @@ class BarStockViewModel(
 ) : ViewModel() {
 
     init {
-        autoBackup()
+        autoSync()
     }
 
     private val _currentScreen = MutableStateFlow(AppScreen.AUTH)
@@ -253,9 +253,9 @@ class BarStockViewModel(
     fun syncData() {
         viewModelScope.launch {
             _isSyncing.value = true
-            val result = backupService.backupData("backup_default")
+            val result = backupService.syncData()
             if (result.isSuccess) {
-                _toastMessage.emit("Synced with cloud successfully!")
+                _toastMessage.emit("Cloud data synchronized successfully!")
             } else {
                 _toastMessage.emit("Sync failed: ${result.exceptionOrNull()?.message}")
             }
@@ -263,13 +263,19 @@ class BarStockViewModel(
         }
     }
 
-    fun autoBackup() {
+    fun autoSync() {
         viewModelScope.launch {
             try {
-                backupService.backupData("backup_default")
+                backupService.syncData()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun autoBackup() {
+        viewModelScope.launch {
+            backupService.backupData()
         }
     }
 
