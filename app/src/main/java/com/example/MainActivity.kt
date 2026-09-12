@@ -97,6 +97,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val barProfile by viewModel.barProfile.collectAsState()
     val currentScreen by viewModel.currentScreen.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     val allUsers by viewModel.allUsers.collectAsState()
     val pendingUsers by viewModel.pendingUsers.collectAsState()
     val attendants by viewModel.attendants.collectAsState()
@@ -164,6 +165,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     currentUser = currentUser,
                     allUsers = allUsers,
                     unreadCount = unreadNotificationsCount,
+                    isSyncing = isSyncing,
                     currentScreen = currentScreen,
                     onBackClick = {
                         val user = currentUser
@@ -225,7 +227,6 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 }
 
                 AppScreen.ADMIN_DASHBOARD -> {
-                    val isSyncing by viewModel.isSyncing.collectAsState()
                     AdminDashboardScreen(
                         barProfile = barProfile,
                         counters = allCounters,
