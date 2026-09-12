@@ -61,11 +61,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val user = dao.getUserByIdentifier(identifier.trim())
         if (user != null) {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
-                try {
-                    FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, password.trim()).await()
-                } catch (e: Exception) {
-                    // Ignore for offline fallback
-                }
+                FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, password.trim()).await()
             }
             if (user.password == password.trim()) {
                 return user
