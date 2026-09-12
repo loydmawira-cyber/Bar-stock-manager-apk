@@ -147,7 +147,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
         AppScreen.SHIFT_CLOSING -> "Shift Closing"
         AppScreen.SHIFT_SUMMARY -> "Reconciliation Receipt"
         AppScreen.DISPUTES -> "Dispute Center"
-        AppScreen.LEDGER -> "Losses & Extras Ledger"
+        AppScreen.LEDGER -> "Sales & Settlements"
         AppScreen.COUNTERS_MANAGEMENT -> "Selling Counters"
         AppScreen.ITEMS_MANAGEMENT -> "Stock Prices"
         AppScreen.USERS_MANAGEMENT -> "Attendant Logins"

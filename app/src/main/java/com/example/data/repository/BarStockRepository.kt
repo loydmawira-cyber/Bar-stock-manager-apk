@@ -248,8 +248,15 @@ class BarStockRepository(private val dao: BarStockDao) {
     fun getCounterStocksWithItems(counterId: Long): Flow<List<CounterStockWithItem>> =
         dao.getCounterStocksWithItems(counterId)
 
-    suspend fun setCounterItemStock(counterId: Long, itemId: Long, quantity: Int, minThreshold: Int = 5) {
+    suspend fun setCounterItemStock(
+        counterId: Long,
+        itemId: Long,
+        quantity: Int,
+        minThreshold: Int = 5,
+        adminName: String = "Admin"
+    ) {
         val existing = dao.getCounterStock(counterId, itemId)
+        val isNewAssignment = existing == null
         val current = existing?.currentQuantity ?: 0
         val newQuantity = current + quantity
         val stockId = existing?.id ?: 0L
@@ -274,21 +281,22 @@ class BarStockRepository(private val dao: BarStockDao) {
                 itemId = itemId,
                 itemName = item.name,
                 qtyAddedOrRemoved = quantity,
-                addedByAdminName = "Admin",
+                addedByAdminName = adminName,
                 shiftId = activeShift?.id,
-                attendantConfirmed = true,
-                status = AdjustmentStatus.CONFIRMED,
-                reason = "Stock Addition"
+                attendantConfirmed = activeShift == null,
+                status = if (activeShift == null) AdjustmentStatus.CONFIRMED else AdjustmentStatus.PENDING_CONFIRMATION,
+                reason = if (isNewAssignment) "Assigned Item to Counter" else "Stock Addition"
             )
             val adjId = dao.insertStockAdjustment(adjustment)
             if (activeShift != null) {
+                val actionWord = if (isNewAssignment) "assigned" else "added"
                 dao.insertNotification(
                     AppNotification(
                         targetUserId = activeShift.attendantId,
                         targetRole = UserRole.ATTENDANT,
                         type = NotificationType.MID_SHIFT_ADJUSTMENT,
-                        title = "Stock Added: ${item.name}",
-                        message = "Admin added +$quantity units of ${item.name}. Total stock on shelf is now $newQuantity.",
+                        title = if (isNewAssignment) "Item Assigned: ${item.name}" else "Stock Added: ${item.name}",
+                        message = "Admin $adminName $actionWord +$quantity units of ${item.name} at ${counter.name}. Total stock is now $newQuantity. Please confirm receipt.",
                         relatedId = adjId
                     )
                 )
@@ -588,7 +596,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val verifications = dao.getStockVerificationsForShiftSync(shiftId)
         val confirmedAdjustments = dao.getConfirmedAdjustmentsForShiftSync(shiftId)
 
-        return verifications.map { ver ->
+        val closingList = verifications.map { ver ->
             val netAdj = confirmedAdjustments.filter { it.itemId == ver.itemId }.sumOf { it.qtyAddedOrRemoved }
             ClosingItemInput(
                 itemId = ver.itemId,
@@ -598,9 +606,32 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitPrice = ver.unitPrice,
                 openingQty = ver.attendantEnteredQty,
                 adjustmentQty = netAdj,
-                closingQty = ver.attendantEnteredQty + netAdj
+                closingQty = maxOf(0, ver.attendantEnteredQty + netAdj)
             )
+        }.toMutableList()
+
+        val existingItemIds = verifications.map { it.itemId }.toSet()
+        val extraAdjustments = confirmedAdjustments.filter { it.itemId !in existingItemIds }
+        extraAdjustments.groupBy { it.itemId }.forEach { (itemId, adjs) ->
+            val item = dao.getItemById(itemId)
+            if (item != null) {
+                val netAdj = adjs.sumOf { it.qtyAddedOrRemoved }
+                closingList.add(
+                    ClosingItemInput(
+                        itemId = itemId,
+                        itemName = item.name,
+                        category = item.category,
+                        unitType = item.unitType,
+                        unitPrice = item.unitPrice,
+                        openingQty = 0,
+                        adjustmentQty = netAdj,
+                        closingQty = maxOf(0, netAdj)
+                    )
+                )
+            }
         }
+
+        return closingList
     }
 
     suspend fun closeShiftAndReconcile(

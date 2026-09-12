@@ -180,7 +180,12 @@ class BarStockViewModel(
     private val _selectedCounterId = MutableStateFlow<Long?>(null)
     val selectedCounterId: StateFlow<Long?> = _selectedCounterId.asStateFlow()
 
-    val selectedCounterStocks: StateFlow<List<CounterStockWithItem>> = _selectedCounterId.flatMapLatest { id ->
+    val selectedCounterStocks: StateFlow<List<CounterStockWithItem>> = combine(
+        _selectedCounterId,
+        activeShift
+    ) { selId, shift ->
+        selId ?: shift?.counterId
+    }.flatMapLatest { id ->
         if (id != null) repository.getCounterStocksWithItems(id) else flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -818,10 +823,11 @@ class BarStockViewModel(
     }
 
     fun assignItemToCounter(counterId: Long, itemId: Long, initialQty: Int) {
+        val adminName = _currentUser.value?.name ?: "Admin"
         viewModelScope.launch {
-            repository.setCounterItemStock(counterId, itemId, initialQty)
+            repository.setCounterItemStock(counterId, itemId, initialQty, adminName = adminName)
             autoBackup()
-            _toastMessage.emit("Added $initialQty units to counter stock.")
+            _toastMessage.emit("Assigned/Added $initialQty units to counter stock.")
         }
     }
 

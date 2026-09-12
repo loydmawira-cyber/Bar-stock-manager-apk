@@ -69,9 +69,9 @@ fun AdminBottomNavigationBar(
         ),
         AdminTabItem(
             screen = AppScreen.LEDGER,
-            label = "Finance",
+            label = "Sales",
             icon = Icons.Filled.AttachMoney,
-            testTag = "admin_tab_finance"
+            testTag = "admin_tab_sales"
         ),
         AdminTabItem(
             screen = AppScreen.DISPUTES,
