@@ -242,21 +242,34 @@ class BarStockViewModel(
                 _toastMessage.emit("Please enter your email/phone and password.")
                 return@launch
             }
-            val user = try {
-                repository.authenticateUser(identifier, password)
-            } catch (e: Exception) {
-                _toastMessage.emit("Firebase login failed: ${e.message ?: "check the account and password"}")
-                return@launch
+            val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(identifier.trim()).matches()
+            if (isEmail) {
+                try {
+                    FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(identifier.trim(), password.trim())
+                        .await()
+                } catch (e: Exception) {
+                    _toastMessage.emit("Firebase login failed: ${e.message ?: "check the account and password"}")
+                    return@launch
+                }
+            } else {
+                try {
+                    if (FirebaseAuth.getInstance().currentUser == null) {
+                        FirebaseAuth.getInstance().signInAnonymously().await()
+                    }
+                } catch (e: Exception) {
+                    _toastMessage.emit("Cloud access failed: ${e.message ?: "enable Anonymous sign-in in Firebase"}")
+                    return@launch
+                }
             }
-            if (user == null) {
-                _toastMessage.emit("Invalid login credentials. Please check your password.")
-                return@launch
-            }
-            // Authenticate first: repository login establishes Firebase Auth
-            // for email accounts, which Firestore rules require for sync.
-            val syncResult = backupService.syncData()
+            val syncResult = backupService.syncData(identifier.trim())
             if (syncResult.isFailure) {
                 _toastMessage.emit("Login succeeded, but cloud sync failed. Check Firestore rules and try again.")
+                return@launch
+            }
+            val user = repository.authenticateUser(identifier, password)
+            if (user == null) {
+                _toastMessage.emit("Account authenticated, but no matching app profile was found in cloud data.")
                 return@launch
             }
             loginUser(user)
