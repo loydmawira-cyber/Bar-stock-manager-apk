@@ -62,14 +62,14 @@ class MainActivity : ComponentActivity() {
 
         var syncJob: kotlinx.coroutines.Job? = null
         database.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer(
-            "users", "items", "counters", "counter_stocks", "shifts", 
+            "bar_profile", "users", "items", "counters", "counter_stocks", "shifts", 
             "stock_verifications", "shift_closings", "disputes", 
             "stock_adjustments", "reconciliations", "app_notifications"
         ) {
             override fun onInvalidated(tables: Set<String>) {
                 syncJob?.cancel()
                 syncJob = this@MainActivity.lifecycleScope.launch {
-                    kotlinx.coroutines.delay(3000)
+                    kotlinx.coroutines.delay(1000)
                     backupService.backupData()
                 }
             }

@@ -242,37 +242,34 @@ class BarStockViewModel(
                 _toastMessage.emit("Please enter your email/phone and password.")
                 return@launch
             }
-            val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(identifier.trim()).matches()
-            if (isEmail) {
-                try {
-                    FirebaseAuth.getInstance()
-                        .signInWithEmailAndPassword(identifier.trim(), password.trim())
-                        .await()
-                } catch (e: Exception) {
-                    _toastMessage.emit("Firebase login failed: ${e.message ?: "check the account and password"}")
-                    return@launch
-                }
-            } else {
-                try {
-                    if (FirebaseAuth.getInstance().currentUser == null) {
-                        FirebaseAuth.getInstance().signInAnonymously().await()
+
+            // 1. Try local authentication first (instant and reliable)
+            val localUser = repository.authenticateUser(identifier.trim(), password.trim())
+            if (localUser != null) {
+                loginUser(localUser)
+                // Sync cloud in background without blocking login
+                autoSync()
+                return@launch
+            }
+
+            // 2. If not found locally, attempt to retrieve cloud tenant data for this user
+            _isSyncing.value = true
+            try {
+                val syncResult = backupService.syncData(identifier.trim())
+                if (syncResult.isSuccess) {
+                    val syncedUser = repository.authenticateUser(identifier.trim(), password.trim())
+                    if (syncedUser != null) {
+                        loginUser(syncedUser)
+                        return@launch
                     }
-                } catch (e: Exception) {
-                    _toastMessage.emit("Cloud access failed: ${e.message ?: "enable Anonymous sign-in in Firebase"}")
-                    return@launch
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isSyncing.value = false
             }
-            val syncResult = backupService.syncData(identifier.trim())
-            if (syncResult.isFailure) {
-                _toastMessage.emit("Login succeeded, but cloud sync failed. Check Firestore rules and try again.")
-                return@launch
-            }
-            val user = repository.authenticateUser(identifier, password)
-            if (user == null) {
-                _toastMessage.emit("Account authenticated, but no matching app profile was found in cloud data.")
-                return@launch
-            }
-            loginUser(user)
+
+            _toastMessage.emit("Invalid credentials. Please verify your email/phone and password.")
         }
     }
 
@@ -284,7 +281,7 @@ class BarStockViewModel(
             if (result.isSuccess) {
                 _toastMessage.emit("Cloud data synchronized successfully!")
             } else {
-                _toastMessage.emit("Sync failed: ${result.exceptionOrNull()?.message}")
+                _toastMessage.emit("Sync failed: ${result.exceptionOrNull()?.message ?: "Check connection"}")
             }
             _isSyncing.value = false
         }
@@ -305,21 +302,28 @@ class BarStockViewModel(
 
     private fun autoBackup() {
         viewModelScope.launch {
-            backupService.backupData()
+            try {
+                backupService.backupData()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun logout() {
         viewModelScope.launch {
-            // Persist the latest Room state before another login can restore
-            // an older cloud snapshot over it.
-            val result = backupService.backupData()
-            if (result.isFailure) {
-                _toastMessage.emit("Could not save the latest changes before logout. Please try again.")
-                return@launch
+            _isSyncing.value = true
+            try {
+                // Ensure latest local snapshot is saved to cloud before clearing user
+                backupService.backupData()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isSyncing.value = false
+                _currentUser.value = null
+                _currentScreen.value = AppScreen.AUTH
+                _toastMessage.emit("Logged out successfully.")
             }
-            _currentUser.value = null
-            _currentScreen.value = AppScreen.AUTH
         }
     }
 
@@ -359,6 +363,8 @@ class BarStockViewModel(
                 role = UserRole.ADMIN,
                 password = password.trim()
             )
+
+            autoBackup()
 
             val newAdminUser = repository.getUserById(adminId)
             if (newAdminUser != null) {
@@ -400,6 +406,7 @@ class BarStockViewModel(
                 updatedAt = System.currentTimeMillis()
             )
             repository.saveBarProfile(updated)
+            autoBackup()
             _toastMessage.emit("Bar Profile updated successfully!")
         }
     }
@@ -411,6 +418,7 @@ class BarStockViewModel(
                 return@launch
             }
             repository.registerUser(name, email, phone, UserRole.ATTENDANT, password)
+            autoBackup()
             _toastMessage.emit("Registration submitted! Account is pending admin approval.")
             _currentScreen.value = AppScreen.AUTH
         }
@@ -425,6 +433,7 @@ class BarStockViewModel(
             }
             val password = initialPassword.ifBlank { "123456" }
             repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), password.trim())
+            autoBackup()
             _toastMessage.emit("Attendant account created for $name with password.")
         }
     }
@@ -432,6 +441,7 @@ class BarStockViewModel(
     fun approveUser(userId: Long) {
         viewModelScope.launch {
             repository.updateUserStatus(userId, UserStatus.APPROVED)
+            autoBackup()
             _toastMessage.emit("Attendant account approved.")
         }
     }
@@ -439,6 +449,7 @@ class BarStockViewModel(
     fun revokeUser(userId: Long) {
         viewModelScope.launch {
             repository.updateUserStatus(userId, UserStatus.REVOKED)
+            autoBackup()
             _toastMessage.emit("Attendant login access revoked.")
         }
     }
@@ -446,6 +457,7 @@ class BarStockViewModel(
     fun deleteUser(userId: Long) {
         viewModelScope.launch {
             repository.deleteUser(userId)
+            autoBackup()
             _toastMessage.emit("Attendant profile deleted.")
         }
     }
@@ -466,6 +478,7 @@ class BarStockViewModel(
                 if (user != null && _currentUser.value?.id == userId) {
                     _currentUser.value = user
                 }
+                autoBackup()
                 _toastMessage.emit("Password changed successfully!")
                 onSuccess()
             }.onFailure { error ->
@@ -491,6 +504,7 @@ class BarStockViewModel(
             }
             val result = repository.resetPasswordByIdentifier(identifier, newPassword)
             result.onSuccess { user ->
+                autoBackup()
                 _toastMessage.emit("Password reset successful! You can now log in.")
                 onSuccess(user)
             }.onFailure { error ->
@@ -583,6 +597,7 @@ class BarStockViewModel(
                 _toastMessage.emit("Shift #$shiftId started! All opening stock verified OK.")
             }
 
+            autoBackup()
             _currentScreen.value = AppScreen.ACTIVE_SHIFT
         }
     }
@@ -591,6 +606,7 @@ class BarStockViewModel(
     fun confirmAdjustment(adjustment: StockAdjustment) {
         viewModelScope.launch {
             repository.confirmStockAdjustment(adjustment)
+            autoBackup()
             _toastMessage.emit("Stock adjustment confirmed and added to your shift baseline.")
         }
     }
@@ -599,6 +615,7 @@ class BarStockViewModel(
         val user = _currentUser.value ?: return
         viewModelScope.launch {
             repository.disputeStockAdjustment(adjustment, user.name)
+            autoBackup()
             _toastMessage.emit("Adjustment discrepancy reported as dispute to Admin.")
         }
     }
@@ -676,6 +693,7 @@ class BarStockViewModel(
             _lastClosedShift.value = closedShift
             _lastShiftClosings.value = closings
 
+            autoBackup()
             _toastMessage.emit("Shift closed successfully and reconciled.")
             _currentScreen.value = AppScreen.SHIFT_SUMMARY
         }
@@ -718,6 +736,7 @@ class BarStockViewModel(
                 adminName = admin.name,
                 adjustedStockQty = adjustedStockQty
             )
+            autoBackup()
             _toastMessage.emit("Dispute resolved successfully.")
         }
     }
@@ -742,6 +761,7 @@ class BarStockViewModel(
                 adminName = admin.name,
                 reason = reason.ifBlank { "Restock" }
             )
+            autoBackup()
             _toastMessage.emit("Stock adjustment recorded.")
         }
     }
@@ -759,6 +779,7 @@ class BarStockViewModel(
             }
             val newId = repository.addCounter(name, location)
             _selectedCounterId.value = newId
+            autoBackup()
             _toastMessage.emit("Counter '${name.trim()}' created.")
         }
     }
@@ -772,6 +793,7 @@ class BarStockViewModel(
             val existing = repository.getCounterById(counterId)
             if (existing != null) {
                 repository.updateCounter(existing.copy(name = name.trim(), location = location.trim()))
+                autoBackup()
                 _toastMessage.emit("Counter '${name.trim()}' updated successfully.")
             }
         }
@@ -790,6 +812,7 @@ class BarStockViewModel(
                 val remaining = allCounters.value.filter { it.id != counterId }
                 _selectedCounterId.value = remaining.firstOrNull()?.id
             }
+            autoBackup()
             _toastMessage.emit("Counter '${counter.name}' deleted.")
         }
     }
@@ -797,6 +820,7 @@ class BarStockViewModel(
     fun assignItemToCounter(counterId: Long, itemId: Long, initialQty: Int) {
         viewModelScope.launch {
             repository.setCounterItemStock(counterId, itemId, initialQty)
+            autoBackup()
             _toastMessage.emit("Added $initialQty units to counter stock.")
         }
     }
