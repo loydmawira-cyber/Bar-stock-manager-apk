@@ -13,11 +13,12 @@ class BackupService(private val dao: BarStockDao) {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
     private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(BackupData::class.java)
 
-    private suspend fun tenantId(): String {
+    private suspend fun tenantId(identityOverride: String? = null): String {
         val firebaseEmail = FirebaseAuth.getInstance().currentUser?.email
         val admin = dao.getAllUsersSync().firstOrNull { it.role.name == "ADMIN" }
         val profile = dao.getBarProfileSync()
-        val identity = firebaseEmail?.trim()?.lowercase()
+        val identity = identityOverride?.trim()?.lowercase()
+            ?: firebaseEmail?.trim()?.lowercase()
             ?: admin?.email?.trim()?.lowercase() ?: profile?.let { "${it.barName}|${it.location}" }
             ?: error("Cannot identify this bar")
         val hash = MessageDigest.getInstance("SHA-256").digest(identity.lowercase().toByteArray())
@@ -39,8 +40,8 @@ class BackupService(private val dao: BarStockDao) {
         ).await()
     }
 
-    suspend fun syncData(): Result<Unit> = runCatching {
-        val ref = firestore.collection("backups").document(tenantId())
+    suspend fun syncData(identityOverride: String? = null): Result<Unit> = runCatching {
+        val ref = firestore.collection("backups").document(tenantId(identityOverride))
         var remote = ref.get().await()
         // Migrate data created by the previous version, which used this shared document.
         if (!remote.exists()) {
