@@ -25,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.billing.BillingManager
 import com.example.data.db.BarStockDatabase
 import com.example.data.model.UserRole
 import com.example.data.repository.BarStockRepository
@@ -59,6 +60,7 @@ class MainActivity : ComponentActivity() {
         val database = BarStockDatabase.getDatabase(applicationContext)
         val repository = BarStockRepository(database.barStockDao())
         val backupService = com.example.data.repository.BackupService(database.barStockDao())
+        val billingManager = BillingManager(applicationContext, lifecycleScope)
 
         var syncJob: kotlinx.coroutines.Job? = null
         database.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer(
@@ -81,7 +83,7 @@ class MainActivity : ComponentActivity() {
                     factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return BarStockViewModel(repository, backupService) as T
+                            return BarStockViewModel(repository, backupService, billingManager) as T
                         }
                     }
                 )
@@ -122,6 +124,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val selectedCounterId by viewModel.selectedCounterId.collectAsState()
     val selectedCounterStocks by viewModel.selectedCounterStocks.collectAsState()
     val selectedAttendantFilterId by viewModel.selectedAttendantFilterId.collectAsState()
+    val billingStatus by viewModel.billingStatus.collectAsState()
+    val availableBillingPlans by viewModel.availableBillingPlans.collectAsState()
+    val billingConnectionState by viewModel.billingConnectionState.collectAsState()
 
     var showPasswordDialog by remember { mutableStateOf(false) }
 
@@ -251,6 +256,16 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     BarProfileScreen(
                         barProfile = barProfile,
                         currentUser = currentUser,
+                        billingStatus = billingStatus,
+                        availablePlans = availableBillingPlans,
+                        billingConnectionState = billingConnectionState,
+                        onLaunchPurchase = { activity, plan -> viewModel.launchBillingPurchase(activity, plan) },
+                        onRestorePurchases = { viewModel.restoreBillingPurchases() },
+                        onOpenSubscriptions = { activity -> viewModel.openGooglePlaySubscriptions(activity) },
+                        onActivateSandbox = { plan -> viewModel.activateSandboxBillingPlan(plan) },
+                        onSimulateTrialActive = { viewModel.simulateTrialActive() },
+                        onSimulateTrialExpired = { viewModel.simulateTrialExpired() },
+                        onResetSubscription = { viewModel.resetSubscriptionToFree() },
                         onSaveProfile = { name, location, icon, photo, phone, currency, manager, hours ->
                             viewModel.updateBarProfile(name, location, icon, photo, phone, currency, manager, hours)
                         },

@@ -81,8 +81,6 @@ val MONTH_NAMES = listOf(
 enum class TimeframeMode {
     ALL_TIME,
     TODAY,
-    YESTERDAY,
-    THIS_WEEK,
     MONTH,
     YEAR
 }
@@ -138,33 +136,6 @@ fun LedgerScreen(
                 }.timeInMillis
                 recon.date >= startOfDay
             }
-            TimeframeMode.YESTERDAY -> {
-                val startOfYesterday = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-                val startOfToday = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-                recon.date in startOfYesterday until startOfToday
-            }
-            TimeframeMode.THIS_WEEK -> {
-                val startOfWeek = Calendar.getInstance().apply {
-                    firstDayOfWeek = Calendar.MONDAY
-                    set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-                recon.date >= startOfWeek
-            }
             TimeframeMode.MONTH -> {
                 reconMonth == selectedMonth && reconYear == selectedYear
             }
@@ -191,8 +162,6 @@ fun LedgerScreen(
     val timeframeSummaryLabel = when (timeframeMode) {
         TimeframeMode.ALL_TIME -> "All Time"
         TimeframeMode.TODAY -> "Today"
-        TimeframeMode.YESTERDAY -> "Yesterday"
-        TimeframeMode.THIS_WEEK -> "This Week"
         TimeframeMode.MONTH -> "${MONTH_NAMES[selectedMonth]} $selectedYear"
         TimeframeMode.YEAR -> "Year $selectedYear"
     }
@@ -212,126 +181,88 @@ fun LedgerScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    // Attendant Filter Bar (if Admin)
-                    if (currentUser.role == UserRole.ADMIN) {
+                    val isFiltered = timeframeMode != TimeframeMode.ALL_TIME || (currentUser.role == UserRole.ADMIN && selectedAttendantId != null)
+
+                    if (currentUser.role == UserRole.ADMIN || isFiltered) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Filled.Person,
-                                    contentDescription = null,
-                                    tint = AmberPrimary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "ATTENDANT FILTER",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AmberPrimary,
-                                    letterSpacing = 0.8.sp
-                                )
-                            }
+                            if (currentUser.role == UserRole.ADMIN) {
+                                Box {
+                                    OutlinedButton(
+                                        onClick = { showAttendantDropdown = true },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("filter_attendant_button")
+                                    ) {
+                                        Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = AmberPrimary)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = selectedAttendantName,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
 
-                            Box {
-                                OutlinedButton(
-                                    onClick = { showAttendantDropdown = true },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.testTag("filter_attendant_button")
-                                ) {
-                                    Icon(Icons.Filled.FilterList, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = selectedAttendantName,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = showAttendantDropdown,
-                                    onDismissRequest = { showAttendantDropdown = false },
-                                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
-                                ) {
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "All Attendants",
-                                                fontWeight = if (selectedAttendantId == null) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (selectedAttendantId == null) AmberPrimary else MaterialTheme.colorScheme.onSurface
-                                            )
-                                        },
-                                        onClick = {
-                                            onSelectAttendantFilter(null)
-                                            showAttendantDropdown = false
-                                        }
-                                    )
-
-                                    attendants.forEach { att ->
+                                    DropdownMenu(
+                                        expanded = showAttendantDropdown,
+                                        onDismissRequest = { showAttendantDropdown = false },
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                                    ) {
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    text = att.name,
-                                                    fontWeight = if (selectedAttendantId == att.id) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (selectedAttendantId == att.id) AmberPrimary else MaterialTheme.colorScheme.onSurface
+                                                    text = "All Attendants",
+                                                    fontWeight = if (selectedAttendantId == null) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (selectedAttendantId == null) AmberPrimary else MaterialTheme.colorScheme.onSurface
                                                 )
                                             },
                                             onClick = {
-                                                onSelectAttendantFilter(att.id)
+                                                onSelectAttendantFilter(null)
                                                 showAttendantDropdown = false
                                             }
                                         )
+
+                                        attendants.forEach { att ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = att.name,
+                                                        fontWeight = if (selectedAttendantId == att.id) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (selectedAttendantId == att.id) AmberPrimary else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                },
+                                                onClick = {
+                                                    onSelectAttendantFilter(att.id)
+                                                    showAttendantDropdown = false
+                                                }
+                                            )
+                                        }
                                     }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+
+                            if (isFiltered) {
+                                TextButton(
+                                    onClick = {
+                                        timeframeMode = TimeframeMode.ALL_TIME
+                                        if (currentUser.role == UserRole.ADMIN) {
+                                            onSelectAttendantFilter(null)
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Clear, contentDescription = null, modifier = Modifier.size(14.dp), tint = AmberPrimary)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Reset Filters", fontSize = 11.sp, color = AmberPrimary)
                                 }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
                     }
-
-                    // Timeframe Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = AmberPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "TIMEFRAME FILTER",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AmberPrimary,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-
-                        if (timeframeMode != TimeframeMode.ALL_TIME || (currentUser.role == UserRole.ADMIN && selectedAttendantId != null)) {
-                            TextButton(
-                                onClick = {
-                                    timeframeMode = TimeframeMode.ALL_TIME
-                                    if (currentUser.role == UserRole.ADMIN) {
-                                        onSelectAttendantFilter(null)
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Filled.Clear, contentDescription = null, modifier = Modifier.size(14.dp), tint = AmberPrimary)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Reset Filters", fontSize = 11.sp, color = AmberPrimary)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
 
                     // Timeframe Filter Chips Row (Quick presets + Month picker + Year picker)
                     Row(
@@ -359,34 +290,6 @@ fun LedgerScreen(
                             selected = timeframeMode == TimeframeMode.TODAY,
                             onClick = { timeframeMode = TimeframeMode.TODAY },
                             label = { Text("Today", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AmberPrimary,
-                                selectedLabelColor = Color.Black,
-                                containerColor = DarkSurfaceVariant,
-                                labelColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-
-                        // Yesterday
-                        FilterChip(
-                            selected = timeframeMode == TimeframeMode.YESTERDAY,
-                            onClick = { timeframeMode = TimeframeMode.YESTERDAY },
-                            label = { Text("Yesterday", fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AmberPrimary,
-                                selectedLabelColor = Color.Black,
-                                containerColor = DarkSurfaceVariant,
-                                labelColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-
-                        // This Week
-                        FilterChip(
-                            selected = timeframeMode == TimeframeMode.THIS_WEEK,
-                            onClick = { timeframeMode = TimeframeMode.THIS_WEEK },
-                            label = { Text("This Week", fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AmberPrimary,
                                 selectedLabelColor = Color.Black,

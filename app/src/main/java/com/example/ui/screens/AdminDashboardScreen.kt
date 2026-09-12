@@ -403,7 +403,9 @@ fun AdminDashboardScreen(
             }
         }
 
-        // Recent Shifts & Shift Reconciliations
+        // Active Shifts Section
+        val activeShifts = shifts.filter { it.status == com.example.data.model.ShiftStatus.ACTIVE }
+
         item {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -412,7 +414,7 @@ fun AdminDashboardScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "RECENT SHIFTS & RECONCILIATIONS",
+                    text = "ACTIVE SHIFTS (${activeShifts.size})",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -420,63 +422,74 @@ fun AdminDashboardScreen(
                 )
 
                 TextButton(onClick = { onNavigate(AppScreen.LEDGER) }) {
-                    Text("View Full Ledger", color = AmberPrimary, fontSize = 12.sp)
+                    Text("View Sales", color = AmberPrimary, fontSize = 12.sp)
                 }
             }
         }
 
-        items(shifts.take(5)) { shift ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = shift.status == com.example.data.model.ShiftStatus.CLOSED) {
-                        onViewShiftReceipt(shift)
-                    }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        if (activeShifts.isEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            text = "${shift.counterName} · Shift #${shift.id}",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Attendant: ${shift.attendantName}",
-                            fontSize = 12.sp,
+                            text = "No active shifts currently running",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Active attendant counter shifts will appear here in real-time.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        } else {
+            items(activeShifts) { shift ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = formatDateTime(shift.startTime),
+                                text = "${shift.counterName} · Shift #${shift.id}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Attendant: ${shift.attendantName}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Started: ${formatDateTime(shift.startTime)}",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (shift.status == com.example.data.model.ShiftStatus.CLOSED) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "· View Receipt >",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AmberPrimary
-                                )
-                            }
                         }
-                    }
 
-                    Column(horizontalAlignment = Alignment.End) {
-                        ShiftStatusBadge(status = shift.status)
-                        if (shift.status == com.example.data.model.ShiftStatus.CLOSED) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            ReconciliationBadge(type = shift.reconciliationType, variance = shift.variance)
+                        Column(horizontalAlignment = Alignment.End) {
+                            ShiftStatusBadge(status = shift.status)
                         }
                     }
                 }

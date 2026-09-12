@@ -5,6 +5,10 @@ import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
 import androidx.lifecycle.viewModelScope
+import com.example.data.billing.BillingConnectionState
+import com.example.data.billing.BillingManager
+import com.example.data.billing.BillingPlan
+import com.example.data.billing.BillingStatus
 import com.example.data.model.AdjustmentStatus
 import com.example.data.model.AppNotification
 import com.example.data.model.Counter
@@ -81,8 +85,14 @@ data class ClosingCountState(
 
 class BarStockViewModel(
     private val repository: BarStockRepository,
-    private val backupService: BackupService
+    private val backupService: BackupService,
+    private val billingManager: BillingManager
 ) : ViewModel() {
+
+    // Billing state & actions
+    val billingStatus = billingManager.billingStatus
+    val availableBillingPlans = billingManager.availablePlans
+    val billingConnectionState = billingManager.connectionState
 
     // Must be initialized before init{} because startup synchronization
     // updates this state immediately.
@@ -91,6 +101,11 @@ class BarStockViewModel(
 
     init {
         autoSync()
+        viewModelScope.launch {
+            billingManager.billingMessages.collect { msg ->
+                _toastMessage.emit(msg)
+            }
+        }
     }
 
     private val _currentScreen = MutableStateFlow(AppScreen.AUTH)
@@ -899,5 +914,40 @@ class BarStockViewModel(
             repository.markAllNotificationsAsRead()
             _toastMessage.emit("All notifications marked as read.")
         }
+    }
+
+    // --- Google Play Billing Actions ---
+
+    fun launchBillingPurchase(activity: android.app.Activity, plan: BillingPlan) {
+        billingManager.launchPurchaseFlow(activity, plan)
+    }
+
+    fun restoreBillingPurchases() {
+        billingManager.restorePurchases()
+    }
+
+    fun openGooglePlaySubscriptions(activity: android.app.Activity) {
+        billingManager.openGooglePlaySubscriptions(activity)
+    }
+
+    fun activateSandboxBillingPlan(plan: BillingPlan) {
+        billingManager.activateSandboxPlan(plan)
+    }
+
+    fun simulateTrialActive() {
+        billingManager.simulateTrialActive()
+    }
+
+    fun simulateTrialExpired() {
+        billingManager.simulateTrialExpired()
+    }
+
+    fun resetSubscriptionToFree() {
+        billingManager.cancelOrResetSubscription()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        billingManager.destroy()
     }
 }

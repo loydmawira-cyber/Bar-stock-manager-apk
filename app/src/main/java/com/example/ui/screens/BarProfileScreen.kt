@@ -61,11 +61,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.Activity
+import com.example.data.billing.BillingConnectionState
+import com.example.data.billing.BillingPlan
+import com.example.data.billing.BillingStatus
 import com.example.data.model.BarProfile
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.ui.components.BAR_ICON_PRESETS
 import com.example.ui.components.BarLogoIcon
+import com.example.ui.components.GoogleBillingAdminSection
 import com.example.ui.components.StatusBadge
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.DarkSurface
@@ -78,6 +83,16 @@ import com.example.ui.viewmodel.AppScreen
 fun BarProfileScreen(
     barProfile: BarProfile,
     currentUser: User?,
+    billingStatus: BillingStatus = BillingStatus(),
+    availablePlans: List<BillingPlan> = emptyList(),
+    billingConnectionState: BillingConnectionState = BillingConnectionState.CONNECTED,
+    onLaunchPurchase: (Activity, BillingPlan) -> Unit = { _, _ -> },
+    onRestorePurchases: () -> Unit = {},
+    onOpenSubscriptions: (Activity) -> Unit = {},
+    onActivateSandbox: (BillingPlan) -> Unit = {},
+    onSimulateTrialActive: () -> Unit = {},
+    onSimulateTrialExpired: () -> Unit = {},
+    onResetSubscription: () -> Unit = {},
     onSaveProfile: (
         name: String,
         location: String,
@@ -521,6 +536,22 @@ fun BarProfileScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Google Play In-App Billing Section (Admin Only)
+            GoogleBillingAdminSection(
+                billingStatus = billingStatus,
+                availablePlans = availablePlans,
+                connectionState = billingConnectionState,
+                onLaunchPurchase = onLaunchPurchase,
+                onRestorePurchases = onRestorePurchases,
+                onOpenSubscriptions = onOpenSubscriptions,
+                onActivateSandbox = onActivateSandbox,
+                onSimulateTrialActive = onSimulateTrialActive,
+                onSimulateTrialExpired = onSimulateTrialExpired,
+                onResetSubscription = onResetSubscription
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
