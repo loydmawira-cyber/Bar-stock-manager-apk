@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.data.dao.BarStockDao
 import com.example.data.model.BackupData
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -13,9 +14,11 @@ class BackupService(private val dao: BarStockDao) {
     private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(BackupData::class.java)
 
     private suspend fun tenantId(): String {
+        val firebaseEmail = FirebaseAuth.getInstance().currentUser?.email
         val admin = dao.getAllUsersSync().firstOrNull { it.role.name == "ADMIN" }
         val profile = dao.getBarProfileSync()
-        val identity = admin?.email?.trim()?.lowercase() ?: profile?.let { "${it.barName}|${it.location}" }
+        val identity = firebaseEmail?.trim()?.lowercase()
+            ?: admin?.email?.trim()?.lowercase() ?: profile?.let { "${it.barName}|${it.location}" }
             ?: error("Cannot identify this bar")
         val hash = MessageDigest.getInstance("SHA-256").digest(identity.lowercase().toByteArray())
         return "bar_" + hash.joinToString("") { "%02x".format(it) }.take(48)
@@ -38,7 +41,12 @@ class BackupService(private val dao: BarStockDao) {
 
     suspend fun syncData(): Result<Unit> = runCatching {
         val ref = firestore.collection("backups").document(tenantId())
-        val remote = ref.get().await()
+        var remote = ref.get().await()
+        // Migrate data created by the previous version, which used this shared document.
+        if (!remote.exists()) {
+            val legacy = firestore.collection("backups").document("backup_default").get().await()
+            if (legacy.exists()) remote = legacy
+        }
         if (remote.exists()) restoreSnapshot(remote.getString("data") ?: error("Cloud data is empty"))
         else ref.set(mapOf("schemaVersion" to 2, "updatedAt" to System.currentTimeMillis(), "data" to adapter.toJson(snapshot()))).await()
     }
