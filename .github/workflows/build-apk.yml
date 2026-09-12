@@ -1,4 +1,4 @@
-name: Build and Release Debug APK
+name: Build and Release APKs
 
 on:
   push:
@@ -12,6 +12,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -27,45 +28,61 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Create temporary debug keystore
+      - name: Restore or generate keystore
         run: |
-          keytool -genkey -v -keystore ./debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000
+          if [ -f "./debug.keystore.base64" ]; then
+            base64 -d ./debug.keystore.base64 > ./debug.keystore
+            echo "Restored original keystore from debug.keystore.base64"
+          elif [ ! -f "./debug.keystore" ]; then
+            keytool -genkey -v -keystore ./debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+            echo "Generated fallback keystore"
+          fi
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --no-daemon
+      - name: Build APKs (Debug and Release)
+        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Upload debug APK artifact
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Prepare APK release asset
-        id: prepare_asset
+      - name: Prepare APK release assets
+        id: prepare_assets
         run: |
           TEMP_DIR=$(mktemp -d)
+          cp app/build/outputs/apk/release/app-release.apk "$TEMP_DIR/app-release.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$TEMP_DIR/app-debug.apk"
-          echo "ASSET_PATH=$TEMP_DIR/app-debug.apk" >> $GITHUB_OUTPUT
+          echo "RELEASE_APK=$TEMP_DIR/app-release.apk" >> $GITHUB_OUTPUT
+          echo "DEBUG_APK=$TEMP_DIR/app-debug.apk" >> $GITHUB_OUTPUT
 
-      - name: Publish APK to GitHub Releases
+      - name: Publish APKs to GitHub Releases
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ASSET_PATH="${{ steps.prepare_asset.outputs.ASSET_PATH }}"
-          RELEASE_TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
-          RELEASE_TITLE="Debug APK Build #${{ github.run_number }}"
+          RELEASE_APK="${{ steps.prepare_assets.outputs.RELEASE_APK }}"
+          DEBUG_APK="${{ steps.prepare_assets.outputs.DEBUG_APK }}"
+          RELEASE_TAG="v1.3-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          RELEASE_TITLE="Release v1.3 (Build #${{ github.run_number }})"
           
-          gh release create "$RELEASE_TAG" "$ASSET_PATH" \
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$DEBUG_APK" \
             --title "$RELEASE_TITLE" \
             --target "${{ github.sha }}" \
             --latest \
-            --notes "Automatically generated debug APK."
+            --notes "Bar Stock Manager v1.3 (versionCode 4). Includes signed app-release.apk and app-debug.apk."
