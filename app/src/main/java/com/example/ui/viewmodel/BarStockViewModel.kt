@@ -273,10 +273,13 @@ class BarStockViewModel(
 
     fun autoSync() {
         viewModelScope.launch {
+            _isSyncing.value = true
             try {
                 backupService.syncData()
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -288,8 +291,17 @@ class BarStockViewModel(
     }
 
     fun logout() {
-        _currentUser.value = null
-        _currentScreen.value = AppScreen.AUTH
+        viewModelScope.launch {
+            // Persist the latest Room state before another login can restore
+            // an older cloud snapshot over it.
+            val result = backupService.backupData()
+            if (result.isFailure) {
+                _toastMessage.emit("Could not save the latest changes before logout. Please try again.")
+                return@launch
+            }
+            _currentUser.value = null
+            _currentScreen.value = AppScreen.AUTH
+        }
     }
 
     // --- Bar Profile Settings ---
