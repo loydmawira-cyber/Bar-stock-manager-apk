@@ -236,8 +236,6 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         reconciliations = allReconciliations,
                         unreadNotificationsCount = unreadNotificationsCount,
                         isSyncing = isSyncing,
-                        onBackupData = { viewModel.backupData() },
-                        onRestoreData = { viewModel.restoreData() },
                         onNavigate = { screen -> viewModel.navigateTo(screen) },
                         onAddStockAdjustment = { counterId, itemId, qty, reason ->
                             viewModel.addStockAdjustment(counterId, itemId, qty, reason)
@@ -422,6 +420,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         },
                         onDeleteItem = { itemId ->
                             viewModel.deleteStockItem(itemId)
+                        },
+                        onSyncData = {
+                            viewModel.syncData()
                         }
                     )
                 }

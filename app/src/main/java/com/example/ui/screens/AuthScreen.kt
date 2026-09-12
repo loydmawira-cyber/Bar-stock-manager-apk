@@ -490,7 +490,35 @@ private fun LoginFormContent(
                     fontSize = 14.sp
                 )
             }
-            Spacer(modifier = Modifier.height(18.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onIdentifierChange("admin@savannahbar.co.ke")
+                        onPasswordChange("admin")
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Admin Demo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = {
+                        onIdentifierChange("john@savannahbar.co.ke")
+                        onPasswordChange("pass")
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Attendant Demo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+
 
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),

@@ -79,6 +79,18 @@ abstract class BarStockDatabase : RoomDatabase() {
                     }
                 }
             }
+
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                INSTANCE?.let { database ->
+                    scope.launch(Dispatchers.IO) {
+                        val dao = database.barStockDao()
+                        if (dao.getUserByEmail("admin@savannahbar.co.ke") == null) {
+                            populateInitialData(dao)
+                        }
+                    }
+                }
+            }
         }
 
         suspend fun populateInitialData(dao: BarStockDao) {

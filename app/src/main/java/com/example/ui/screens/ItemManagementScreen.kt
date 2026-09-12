@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalBar
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,7 +78,8 @@ fun ItemManagementScreen(
     items: List<Item>,
     onCreateItem: (name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String) -> Unit,
     onUpdateItem: (itemId: Long, name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String) -> Unit = { _, _, _, _, _, _, _ -> },
-    onDeleteItem: (itemId: Long) -> Unit = {}
+    onDeleteItem: (itemId: Long) -> Unit = {},
+    onSyncData: () -> Unit = {}
 ) {
     val currency = LocalCurrencySymbol.current
     var showAddItemDialog by remember { mutableStateOf(false) }
@@ -156,13 +159,34 @@ fun ItemManagementScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "STOCK PRICES LIST (${items.size})",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "STOCK PRICES LIST (${items.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.sp
+                    )
+
+                    OutlinedButton(
+                        onClick = onSyncData,
+                        modifier = Modifier.height(28.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Sync,
+                            contentDescription = "Sync Prices",
+                            tint = AmberPrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Sync", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
 
                 if (currentUser?.role == UserRole.ADMIN) {
                     Button(

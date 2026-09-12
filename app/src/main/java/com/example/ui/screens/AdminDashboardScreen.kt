@@ -107,8 +107,6 @@ fun AdminDashboardScreen(
     reconciliations: List<Reconciliation>,
     unreadNotificationsCount: Int = 0,
     isSyncing: Boolean = false,
-    onBackupData: () -> Unit = {},
-    onRestoreData: () -> Unit = {},
     onNavigate: (AppScreen) -> Unit,
     onAddStockAdjustment: (counterId: Long, itemId: Long, qty: Int, reason: String) -> Unit,
     onSelectCounterForManagement: (Long) -> Unit
@@ -469,59 +467,7 @@ fun AdminDashboardScreen(
             }
         }
 
-        item {
-            // Cloud Backup Card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Cloud Backup & Recovery",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Secure your bar stock data online (Firestore)",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = onBackupData,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
-                            enabled = !isSyncing
-                        ) {
-                            Text("Backup Now", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = onRestoreData,
-                            modifier = Modifier.weight(1f),
-                            enabled = !isSyncing
-                        ) {
-                            Text("Restore Data")
-                        }
-                    }
-                    if (isSyncing) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Syncing with cloud...",
-                            fontSize = 12.sp,
-                            color = AmberPrimary,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-        }
+
     }
 
     // Mid-Shift Restock / Adjustment Modal

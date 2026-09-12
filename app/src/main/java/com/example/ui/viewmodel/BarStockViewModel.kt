@@ -84,6 +84,10 @@ class BarStockViewModel(
     private val backupService: BackupService
 ) : ViewModel() {
 
+    init {
+        autoBackup()
+    }
+
     private val _currentScreen = MutableStateFlow(AppScreen.AUTH)
     val currentScreen: StateFlow<AppScreen> = _currentScreen.asStateFlow()
 
@@ -242,36 +246,30 @@ class BarStockViewModel(
         }
     }
 
-    // --- Backup & Restore ---
+    // --- Cloud Synchronization ---
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
-    fun backupData() {
+    fun syncData() {
         viewModelScope.launch {
             _isSyncing.value = true
             val result = backupService.backupData("backup_default")
             if (result.isSuccess) {
-                _toastMessage.emit("Backup to cloud successful!")
+                _toastMessage.emit("Synced with cloud successfully!")
             } else {
-                _toastMessage.emit("Backup failed: ${result.exceptionOrNull()?.message}")
+                _toastMessage.emit("Sync failed: ${result.exceptionOrNull()?.message}")
             }
             _isSyncing.value = false
         }
     }
 
-    fun restoreData() {
+    fun autoBackup() {
         viewModelScope.launch {
-            _isSyncing.value = true
-            val result = backupService.restoreData("backup_default")
-            if (result.isSuccess) {
-                _toastMessage.emit("Data restored successfully!")
-                // Optionally reload or navigate
-                _currentScreen.value = AppScreen.AUTH
-                _currentUser.value = null
-            } else {
-                _toastMessage.emit("Restore failed: ${result.exceptionOrNull()?.message}")
+            try {
+                backupService.backupData("backup_default")
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            _isSyncing.value = false
         }
     }
 
@@ -769,6 +767,7 @@ class BarStockViewModel(
             }
             repository.addItem(name, category, unitPrice, casePrice, unitType, description)
             _toastMessage.emit("Stock item added.")
+            autoBackup()
         }
     }
 
@@ -798,6 +797,7 @@ class BarStockViewModel(
                 )
             )
             _toastMessage.emit("Stock item '${name.trim()}' updated successfully.")
+            autoBackup()
         }
     }
 
@@ -805,6 +805,7 @@ class BarStockViewModel(
         viewModelScope.launch {
             repository.deleteItem(itemId)
             _toastMessage.emit("Stock item deleted.")
+            autoBackup()
         }
     }
 
