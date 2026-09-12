@@ -84,6 +84,11 @@ class BarStockViewModel(
     private val backupService: BackupService
 ) : ViewModel() {
 
+    // Must be initialized before init{} because startup synchronization
+    // updates this state immediately.
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
     init {
         autoSync()
     }
@@ -255,9 +260,6 @@ class BarStockViewModel(
     }
 
     // --- Cloud Synchronization ---
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
-
     fun syncData() {
         viewModelScope.launch {
             _isSyncing.value = true
