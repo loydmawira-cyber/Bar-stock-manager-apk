@@ -67,6 +67,7 @@ fun BarAppTopBar(
     currentUser: User?,
     allUsers: List<User>,
     unreadCount: Int,
+    isSyncing: Boolean,
     currentScreen: AppScreen,
     onBackClick: (() -> Unit)? = null,
     onNotificationClick: () -> Unit,
@@ -123,6 +124,25 @@ fun BarAppTopBar(
         },
         actions = {
             if (currentUser != null) {
+                Surface(
+                    color = if (isSyncing) AmberPrimary.copy(alpha = 0.14f) else EmeraldGreen.copy(alpha = 0.14f),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.padding(end = 6.dp).testTag("sync_status_pill")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("✓", color = if (isSyncing) AmberPrimary else EmeraldGreen, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isSyncing) "Synchronizing..." else "Synced",
+                            color = if (isSyncing) AmberPrimary else EmeraldGreen,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 // Notification Bell with Badge
                 IconButton(
                     onClick = onNotificationClick,
