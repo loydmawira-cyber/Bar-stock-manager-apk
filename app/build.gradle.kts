@@ -20,8 +20,8 @@ android {
 
     // Keep applicationId unchanged so this APK updates the installed app.
     // Increase versionCode for every release update.
-    versionCode = 3
-    versionName = "1.2"
+    versionCode = 4
+    versionName = "1.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -29,7 +29,7 @@ android {
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH")
-        ?: "${rootDir}/my-upload-key.jks"
+        ?: "${rootDir}/debug.keystore"
 
       storeFile = file(keystorePath)
 
@@ -38,7 +38,7 @@ android {
 
       keyAlias = System.getenv("KEY_ALIAS")
         ?: providers.gradleProperty("KEY_ALIAS").orNull
-        ?: "upload"
+        ?: "androiddebugkey"
 
       keyPassword = System.getenv("KEY_PASSWORD")
         ?: providers.gradleProperty("KEY_PASSWORD").orNull
