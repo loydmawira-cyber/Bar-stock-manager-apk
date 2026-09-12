@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
                 syncJob?.cancel()
                 syncJob = this@MainActivity.lifecycleScope.launch {
                     kotlinx.coroutines.delay(3000)
-                    backupService.backupData("backup_default")
+                    backupService.backupData()
                 }
             }
         })
