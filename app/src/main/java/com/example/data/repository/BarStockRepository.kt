@@ -120,6 +120,7 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     suspend fun getUserById(userId: Long): User? = dao.getUserById(userId)
     suspend fun getUserByEmail(email: String): User? = dao.getUserByEmail(email)
+    suspend fun getUserByIdentifier(identifier: String): User? = dao.getUserByIdentifier(identifier.trim())
 
     suspend fun authenticateUser(identifier: String, password: String): User? {
         val trimmedIdentifier = identifier.trim()
@@ -127,14 +128,22 @@ class BarStockRepository(private val dao: BarStockDao) {
         val user = dao.getUserByIdentifier(trimmedIdentifier)
 
         if (user != null) {
+            // Block revoked or pending accounts from authenticating
+            if (user.status == UserStatus.REVOKED || user.status == UserStatus.PENDING) {
+                return null
+            }
+
             // Check local password match
             if (user.password == trimmedPassword) {
                 // Cloud backup requires a real Firebase session; do not fall back to local-only login for email accounts.
                 if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
-                    try {
-                        FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
-                    } catch (e: Exception) {
-                        return null
+                    val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
+                    if (!currentFbEmail.equals(user.email, ignoreCase = true)) {
+                        try {
+                            FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                        } catch (e: Exception) {
+                            return null
+                        }
                     }
                 }
                 return user
@@ -158,9 +167,12 @@ class BarStockRepository(private val dao: BarStockDao) {
             // missing local user could incorrectly be created as ADMIN.
             try {
                 if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedIdentifier).matches()) {
-                    FirebaseAuth.getInstance()
-                        .signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword)
-                        .await()
+                    val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
+                    if (!currentFbEmail.equals(trimmedIdentifier, ignoreCase = true)) {
+                        FirebaseAuth.getInstance()
+                            .signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword)
+                            .await()
+                    }
                 }
             } catch (e: Exception) {
                 // Firebase sign-in failed

@@ -267,30 +267,45 @@ class BarStockViewModel(
             }
 
             try {
-                // Authenticate first, then refresh this user's exact bar snapshot
-                // before navigating to either dashboard.
-                val localUser = repository.authenticateUser(identifier.trim(), password.trim())
+                val cleanId = identifier.trim()
+                val cleanPass = password.trim()
+
+                // 1. Authenticate locally / Firebase session
+                val localUser = repository.authenticateUser(cleanId, cleanPass)
                 if (localUser != null) {
+                    // Instantly log in local user so UI opens without delay
+                    loginUser(localUser)
+
+                    // Refresh/sync latest bar data from cloud in background
                     _isSyncing.value = true
-                    val syncResult = backupService.syncData(identifier.trim())
-                    val syncedUser = if (syncResult.isSuccess) {
-                        repository.authenticateUser(identifier.trim(), password.trim()) ?: localUser
-                    } else {
-                        localUser
+                    try {
+                        val syncResult = backupService.syncData(cleanId)
+                        if (syncResult.isSuccess) {
+                            repository.getUserByIdentifier(cleanId)?.let { updated ->
+                                loginUser(updated)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        _isSyncing.value = false
                     }
-                    _isSyncing.value = false
-                    loginUser(syncedUser)
                     return@launch
                 }
 
-                // No local account yet: restore the cloud bar containing this email,
-                // then authenticate the restored user so its stored role is retained.
+                // 2. User not found in local database yet (e.g. logging in on a new device or fresh install)
                 _isSyncing.value = true
                 try {
-                    val syncResult = backupService.syncData(identifier.trim())
+                    if (android.util.Patterns.EMAIL_ADDRESS.matcher(cleanId).matches()) {
+                        val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
+                        if (!currentFbEmail.equals(cleanId, ignoreCase = true)) {
+                            FirebaseAuth.getInstance().signInWithEmailAndPassword(cleanId, cleanPass).await()
+                        }
+                    }
+                    val syncResult = backupService.syncData(cleanId)
                     if (syncResult.isSuccess) {
-                        val syncedUser = repository.authenticateUser(identifier.trim(), password.trim())
-                        if (syncedUser != null) {
+                        val syncedUser = repository.getUserByIdentifier(cleanId)
+                        if (syncedUser != null && syncedUser.password == cleanPass) {
                             loginUser(syncedUser)
                             return@launch
                         }
@@ -520,7 +535,11 @@ class BarStockViewModel(
     fun revokeUser(userId: Long) {
         viewModelScope.launch {
             repository.updateUserStatus(userId, UserStatus.REVOKED)
-            autoBackup()
+            try {
+                backupService.backupData()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             _toastMessage.emit("Attendant login access revoked.")
         }
     }
@@ -528,8 +547,12 @@ class BarStockViewModel(
     fun deleteUser(userId: Long) {
         viewModelScope.launch {
             repository.deleteUser(userId)
-            autoBackup()
-            _toastMessage.emit("Attendant profile deleted.")
+            try {
+                backupService.backupData()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            _toastMessage.emit("Attendant account deleted from system. All sales history preserved.")
         }
     }
 

@@ -68,8 +68,9 @@ class BackupService(private val dao: BarStockDao) {
         val targetId = backupId ?: tenantId()
 
         val adminUser = snap.users.firstOrNull { it.role.name == "ADMIN" }
-        val userEmails = snap.users.mapNotNull { it.email.takeIf { e -> e.isNotBlank() }?.lowercase(java.util.Locale.ROOT) }
-        val userPhones = snap.users.mapNotNull { it.phone.takeIf { p -> p.isNotBlank() } }
+        val activeUsers = snap.users.filter { it.status.name != "REVOKED" }
+        val userEmails = activeUsers.mapNotNull { it.email.takeIf { e -> e.isNotBlank() }?.lowercase(java.util.Locale.ROOT) }
+        val userPhones = activeUsers.mapNotNull { it.phone.takeIf { p -> p.isNotBlank() } }
 
         val docData = mapOf(
             "schemaVersion" to 2,

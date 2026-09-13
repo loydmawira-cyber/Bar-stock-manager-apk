@@ -339,6 +339,14 @@ fun UserManagementScreen(
                                             Text("Approve", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                         }
                                     } else if (user.status == UserStatus.APPROVED) {
+                                        IconButton(
+                                            onClick = { onDeleteUser(user.id) }
+                                        ) {
+                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(4.dp))
+
                                         OutlinedButton(
                                             onClick = { onRevokeUser(user.id) },
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed),
