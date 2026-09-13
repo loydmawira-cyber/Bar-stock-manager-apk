@@ -15,36 +15,14 @@ class BackupService(private val dao: BarStockDao) {
     private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(BackupData::class.java)
 
     private suspend fun ensureAuth() {
-        if (FirebaseAuth.getInstance().currentUser == null) {
-            try {
-                FirebaseAuth.getInstance().signInAnonymously().await()
-            } catch (e: Exception) {
-                // Ignore if offline
-            }
+        check(FirebaseAuth.getInstance().currentUser != null) {
+            "Please sign in with your admin or attendant account before using cloud backup."
         }
     }
 
     private fun hashString(input: String): String {
         val hash = MessageDigest.getInstance("SHA-256").digest(input.trim().lowercase(java.util.Locale.ROOT).toByteArray())
         return "bar_" + hash.joinToString("") { "%02x".format(it) }.take(48)
-    }
-
-    /** Login identifiers must not be reused across bars. */
-    suspend fun credentialsAvailable(email: String, phone: String): Result<Boolean> = runCatching {
-        ensureAuth()
-        val cleanEmail = email.trim().lowercase(java.util.Locale.ROOT)
-        val cleanPhone = phone.trim()
-        if (cleanEmail.isNotBlank()) {
-            val emailMatch = firestore.collection("backups")
-                .whereArrayContains("userEmails", cleanEmail).limit(1).get().await()
-            if (!emailMatch.isEmpty) return@runCatching false
-        }
-        if (cleanPhone.isNotBlank()) {
-            val phoneMatch = firestore.collection("backups")
-                .whereArrayContains("userPhones", cleanPhone).limit(1).get().await()
-            if (!phoneMatch.isEmpty) return@runCatching false
-        }
-        true
     }
 
     private suspend fun tenantId(identityOverride: String? = null): String {
