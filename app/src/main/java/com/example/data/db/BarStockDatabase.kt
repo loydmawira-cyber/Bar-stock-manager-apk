@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
         Reconciliation::class,
         AppNotification::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BarStockDatabase : RoomDatabase() {
