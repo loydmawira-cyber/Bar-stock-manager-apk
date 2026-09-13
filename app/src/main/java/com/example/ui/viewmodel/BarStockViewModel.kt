@@ -378,6 +378,10 @@ class BarStockViewModel(
                 return@launch
             }
             try {
+                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
+                    _toastMessage.emit("That admin email or phone number already belongs to another bar.")
+                    return@launch
+                }
                 // Clear previous bar's local data to ensure total data isolation for the new bar
                 repository.clearAllDataForNewBar()
 
@@ -454,8 +458,8 @@ class BarStockViewModel(
 
     fun registerAttendant(name: String, email: String, phone: String, password: String) {
         viewModelScope.launch {
-            if (name.isBlank() || phone.isBlank()) {
-                _toastMessage.emit("Please enter your name and phone number.")
+            if (name.isBlank() || email.isBlank() || phone.isBlank()) {
+                _toastMessage.emit("Please enter your name, unique email, and phone number.")
                 return@launch
             }
             val validation = PasswordValidator.validate(password)
@@ -464,6 +468,10 @@ class BarStockViewModel(
                 return@launch
             }
             try {
+                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
+                    _toastMessage.emit("That email or phone number already belongs to another bar.")
+                    return@launch
+                }
                 repository.registerUser(name, email, phone, UserRole.ATTENDANT, password)
                 autoBackup()
                 _toastMessage.emit("Registration submitted! Account is pending admin approval.")
@@ -477,8 +485,8 @@ class BarStockViewModel(
     // --- Admin User Actions ---
     fun createAttendantByAdmin(name: String, email: String, phone: String, initialPassword: String) {
         viewModelScope.launch {
-            if (name.isBlank() || phone.isBlank()) {
-                _toastMessage.emit("Attendant Name and Phone Number are required.")
+            if (name.isBlank() || email.isBlank() || phone.isBlank()) {
+                _toastMessage.emit("Attendant name, unique email, and phone number are required.")
                 return@launch
             }
             val validation = PasswordValidator.validate(initialPassword)
@@ -487,6 +495,10 @@ class BarStockViewModel(
                 return@launch
             }
             try {
+                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
+                    _toastMessage.emit("That email or phone number already belongs to another bar.")
+                    return@launch
+                }
                 repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), initialPassword.trim())
                 autoBackup()
                 _toastMessage.emit("Attendant account created for $name with strong password.")
