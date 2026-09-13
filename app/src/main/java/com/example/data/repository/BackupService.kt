@@ -97,11 +97,10 @@ class BackupService(private val dao: BarStockDao) {
             try {
                 val emailQuery = firestore.collection("backups")
                     .whereArrayContains("userEmails", cleanIdentity)
-                    .limit(1)
                     .get()
                     .await()
                 if (!emailQuery.isEmpty) {
-                    remoteDoc = emailQuery.documents.firstOrNull()
+                    remoteDoc = emailQuery.documents.maxByOrNull { it.getLong("updatedAt") ?: 0L }
                 }
             } catch (e: Exception) {
                 // continue
@@ -111,11 +110,10 @@ class BackupService(private val dao: BarStockDao) {
                 try {
                     val phoneQuery = firestore.collection("backups")
                         .whereArrayContains("userPhones", identityOverride!!.trim())
-                        .limit(1)
                         .get()
                         .await()
                     if (!phoneQuery.isEmpty) {
-                        remoteDoc = phoneQuery.documents.firstOrNull()
+                        remoteDoc = phoneQuery.documents.maxByOrNull { it.getLong("updatedAt") ?: 0L }
                     }
                 } catch (e: Exception) {
                     // continue
