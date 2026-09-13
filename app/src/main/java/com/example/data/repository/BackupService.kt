@@ -29,6 +29,24 @@ class BackupService(private val dao: BarStockDao) {
         return "bar_" + hash.joinToString("") { "%02x".format(it) }.take(48)
     }
 
+    /** Login identifiers must not be reused across bars. */
+    suspend fun credentialsAvailable(email: String, phone: String): Result<Boolean> = runCatching {
+        ensureAuth()
+        val cleanEmail = email.trim().lowercase(java.util.Locale.ROOT)
+        val cleanPhone = phone.trim()
+        if (cleanEmail.isNotBlank()) {
+            val emailMatch = firestore.collection("backups")
+                .whereArrayContains("userEmails", cleanEmail).limit(1).get().await()
+            if (!emailMatch.isEmpty) return@runCatching false
+        }
+        if (cleanPhone.isNotBlank()) {
+            val phoneMatch = firestore.collection("backups")
+                .whereArrayContains("userPhones", cleanPhone).limit(1).get().await()
+            if (!phoneMatch.isEmpty) return@runCatching false
+        }
+        true
+    }
+
     private suspend fun tenantId(identityOverride: String? = null): String {
         if (identityOverride.isNullOrBlank()) {
             val ownProfile = dao.getBarProfileSync()
@@ -42,7 +60,7 @@ class BackupService(private val dao: BarStockDao) {
             ?: admin?.email?.trim()?.takeIf { it.isNotBlank() }
             ?: admin?.phone?.trim()?.takeIf { it.isNotBlank() }
             ?: profile?.let { "${it.barName}|${it.location}" }
-            ?: "default_establishment"
+            ?: error("This installation is not linked to a bar account")
         return hashString(identity)
     }
 
