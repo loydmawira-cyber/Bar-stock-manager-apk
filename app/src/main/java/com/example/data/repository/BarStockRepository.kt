@@ -49,6 +49,7 @@ class BarStockRepository(private val dao: BarStockDao) {
     }
 
     suspend fun clearAllDataForNewBar() {
+        dao.clearBarProfile()
         dao.clearNotifications()
         dao.clearReconciliations()
         dao.clearStockAdjustments()
