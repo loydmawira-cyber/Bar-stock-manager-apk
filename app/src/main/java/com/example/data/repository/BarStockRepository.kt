@@ -129,13 +129,13 @@ class BarStockRepository(private val dao: BarStockDao) {
         if (user != null) {
             // Check local password match
             if (user.password == trimmedPassword) {
-                // Best-effort Firebase sign-in to sync session, ignoring errors if offline or not in Firebase
-                try {
-                    if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+                // Cloud backup requires a real Firebase session; do not fall back to local-only login for email accounts.
+                if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+                    try {
                         FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                    } catch (e: Exception) {
+                        return null
                     }
-                } catch (e: Exception) {
-                    // Suppress Firebase Auth exceptions so local login continues working
                 }
                 return user
             } else {
