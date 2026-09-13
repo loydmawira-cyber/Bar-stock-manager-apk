@@ -30,6 +30,12 @@ class BackupService(private val dao: BarStockDao) {
     }
 
     private suspend fun tenantId(identityOverride: String? = null): String {
+        if (identityOverride.isNullOrBlank()) {
+            val ownProfile = dao.getBarProfileSync()
+            if (!ownProfile?.barId.isNullOrBlank()) {
+                return "bar_" + ownProfile!!.barId
+            }
+        }
         val admin = dao.getAllUsersSync().firstOrNull { it.role.name == "ADMIN" }
         val profile = dao.getBarProfileSync()
         val identity = identityOverride?.trim()?.takeIf { it.isNotBlank() }
