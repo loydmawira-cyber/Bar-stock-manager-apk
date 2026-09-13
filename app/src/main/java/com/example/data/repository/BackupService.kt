@@ -83,24 +83,18 @@ class BackupService(private val dao: BarStockDao) {
         )
 
         firestore.collection("backups").document(targetId).set(docData).await()
-        // Also update legacy/default document for fallback
-        try {
-            firestore.collection("backups").document("backup_default").set(docData).await()
-        } catch (e: Exception) {
-            // Ignore secondary write errors
-        }
     }
 
     suspend fun syncData(identityOverride: String? = null): Result<Unit> = runCatching {
         ensureAuth()
         var remoteDoc: DocumentSnapshot? = null
+        val cleanIdentity = identityOverride?.trim()?.lowercase(java.util.Locale.ROOT)
 
         // 1. If identity is provided, search Firestore by user email/phone or hash
-        if (!identityOverride.isNullOrBlank()) {
-            val normalized = identityOverride.trim().lowercase(java.util.Locale.ROOT)
+        if (!cleanIdentity.isNullOrBlank()) {
             try {
                 val emailQuery = firestore.collection("backups")
-                    .whereArrayContains("userEmails", normalized)
+                    .whereArrayContains("userEmails", cleanIdentity)
                     .limit(1)
                     .get()
                     .await()
@@ -108,13 +102,13 @@ class BackupService(private val dao: BarStockDao) {
                     remoteDoc = emailQuery.documents.firstOrNull()
                 }
             } catch (e: Exception) {
-                // continue to next strategy
+                // continue
             }
 
             if (remoteDoc == null || !remoteDoc.exists()) {
                 try {
                     val phoneQuery = firestore.collection("backups")
-                        .whereArrayContains("userPhones", identityOverride.trim())
+                        .whereArrayContains("userPhones", identityOverride!!.trim())
                         .limit(1)
                         .get()
                         .await()
@@ -128,7 +122,7 @@ class BackupService(private val dao: BarStockDao) {
 
             if (remoteDoc == null || !remoteDoc.exists()) {
                 try {
-                    val docByHash = firestore.collection("backups").document(hashString(identityOverride)).get().await()
+                    val docByHash = firestore.collection("backups").document(hashString(cleanIdentity)).get().await()
                     if (docByHash.exists()) {
                         remoteDoc = docByHash
                     }
@@ -138,24 +132,13 @@ class BackupService(private val dao: BarStockDao) {
             }
         }
 
-        // 2. Try current local tenant document
+        // 2. Try current local tenant document if no identity provided or identity didn't yield a document
         if (remoteDoc == null || !remoteDoc.exists()) {
             try {
-                val doc = firestore.collection("backups").document(tenantId()).get().await()
+                val localTenantId = tenantId()
+                val doc = firestore.collection("backups").document(localTenantId).get().await()
                 if (doc.exists()) {
                     remoteDoc = doc
-                }
-            } catch (e: Exception) {
-                // continue
-            }
-        }
-
-        // 3. Try legacy default document
-        if (remoteDoc == null || !remoteDoc.exists()) {
-            try {
-                val legacy = firestore.collection("backups").document("backup_default").get().await()
-                if (legacy.exists()) {
-                    remoteDoc = legacy
                 }
             } catch (e: Exception) {
                 // continue
@@ -171,29 +154,46 @@ class BackupService(private val dao: BarStockDao) {
             val remoteDataJson = remoteDoc.getString("data")
 
             if (!remoteDataJson.isNullOrBlank()) {
-                // If remote is strictly newer or local database is unpopulated, restore from cloud
-                if (remoteUpdatedAt > localUpdatedAt || localUsers.isEmpty()) {
+                // Check if the current local database actually belongs to the user/tenant in remoteDoc
+                val remoteUserEmails = (remoteDoc.get("userEmails") as? List<*>)?.mapNotNull { it?.toString()?.lowercase(java.util.Locale.ROOT) } ?: emptyList()
+                val remoteUserPhones = (remoteDoc.get("userPhones") as? List<*>)?.mapNotNull { it?.toString()?.trim() } ?: emptyList()
+
+                val localMatchesRemote = if (!cleanIdentity.isNullOrBlank()) {
+                    localUsers.any { u ->
+                        u.email.lowercase(java.util.Locale.ROOT) == cleanIdentity || u.phone.trim() == identityOverride?.trim()
+                    }
+                } else {
+                    localUsers.any { u ->
+                        remoteUserEmails.contains(u.email.lowercase(java.util.Locale.ROOT)) || remoteUserPhones.contains(u.phone.trim())
+                    }
+                }
+
+                if (!localMatchesRemote || localUsers.isEmpty() || remoteUpdatedAt > localUpdatedAt) {
+                    // Local DB belongs to a different bar/account or is empty -> Wipe local DB and restore remote tenant snapshot
                     restoreSnapshot(remoteDataJson)
                 } else if (localUpdatedAt > remoteUpdatedAt) {
-                    // Local is newer, upload to cloud
+                    // Local DB belongs to this account and has newer local changes -> Upload to cloud
                     backupData(remoteDoc.id)
                 }
             }
         } else {
-            // Document doesn't exist on cloud yet, create initial backup
-            backupData()
+            // Document doesn't exist on cloud yet. If local DB belongs to this identity, back it up
+            if (localUsers.isNotEmpty() && cleanIdentity.isNullOrBlank()) {
+                backupData()
+            }
         }
     }
 
     suspend fun restoreData(backupId: String? = null): Result<Unit> = runCatching {
         ensureAuth()
         val docId = backupId ?: tenantId()
-        var doc = firestore.collection("backups").document(docId).get().await()
-        if (!doc.exists()) {
-            doc = firestore.collection("backups").document("backup_default").get().await()
+        val doc = firestore.collection("backups").document(docId).get().await()
+        if (doc.exists()) {
+            val json = doc.getString("data") ?: error("No cloud backup found")
+            restoreSnapshot(json)
+        } else {
+            error("No backup found for this account")
         }
-        val json = doc.getString("data") ?: error("No cloud backup found")
-        restoreSnapshot(json)
     }
 
     private suspend fun restoreSnapshot(json: String) {
