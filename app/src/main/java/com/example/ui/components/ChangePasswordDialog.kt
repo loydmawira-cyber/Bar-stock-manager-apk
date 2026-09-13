@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.util.PasswordValidator
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
 
@@ -181,8 +182,9 @@ fun ChangePasswordDialog(
                         errorMessage = "Please enter your current password."
                         return@Button
                     }
-                    if (newPassword.length < 4) {
-                        errorMessage = "New password must be at least 4 characters."
+                    val validation = PasswordValidator.validate(newPassword)
+                    if (!validation.isValid) {
+                        errorMessage = validation.missingRequirementsMessage
                         return@Button
                     }
                     if (newPassword != confirmPassword) {

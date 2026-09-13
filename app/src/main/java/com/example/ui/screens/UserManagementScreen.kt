@@ -68,6 +68,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
+import com.example.data.util.PasswordValidator
+import com.example.ui.components.StrongPasswordField
 import com.example.ui.components.UserStatusBadge
 import com.example.ui.components.formatDateTime
 import com.example.ui.theme.AmberPrimary
@@ -137,7 +139,7 @@ fun UserManagementScreen(
                     newName = ""
                     newEmail = ""
                     newPhone = ""
-                    newPassword = "pass" + (1000..9999).random()
+                    newPassword = "BarPass@" + (1000..9999).random()
                     showCreateDialog = true
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
@@ -448,41 +450,27 @@ fun UserManagementScreen(
                         )
                     )
 
-                    OutlinedTextField(
+                    StrongPasswordField(
                         value = newPassword,
                         onValueChange = { newPassword = it },
-                        label = { Text("Initial Password / PIN *") },
-                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                    contentDescription = "Toggle password"
-                                )
-                            }
-                        },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("new_attendant_password"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberPrimary,
-                            focusedLabelColor = AmberPrimary
-                        )
+                        label = "Initial Password *",
+                        placeholder = "Min 8 chars, 1 uppercase, 1 digit, 1 special",
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "new_attendant_password"
                     )
                 }
             },
             confirmButton = {
+                val passwordValid = PasswordValidator.validate(newPassword).isValid
                 Button(
                     onClick = {
-                        if (newName.isNotBlank() && newPhone.isNotBlank()) {
+                        if (newName.isNotBlank() && newPhone.isNotBlank() && passwordValid) {
                             onCreateAttendant(newName, newEmail, newPhone, newPassword)
                             showCreateDialog = false
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
-                    enabled = newName.isNotBlank() && newPhone.isNotBlank(),
+                    enabled = newName.isNotBlank() && newPhone.isNotBlank() && passwordValid,
                     modifier = Modifier.testTag("submit_create_attendant_button")
                 ) {
                     Text("Create Account", color = Color.Black, fontWeight = FontWeight.Bold)

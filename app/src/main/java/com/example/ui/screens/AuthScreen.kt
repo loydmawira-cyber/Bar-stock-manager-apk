@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -87,6 +88,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.BarProfile
 import com.example.data.model.User
 import com.example.data.model.UserRole
+import com.example.ui.components.StrongPasswordField
 import com.example.ui.components.UserStatusBadge
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.DarkSurfaceVariant
@@ -114,6 +116,7 @@ fun AuthScreen(
         password: String
     ) -> Unit,
     onSelfResetPassword: (identifier: String, newPassword: String) -> Unit,
+    onSendPasswordResetEmail: ((email: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
     phoneAuthManager: com.example.ui.viewmodel.PhoneAuthManager? = null,
     onLoginPhoneCredential: ((com.google.firebase.auth.PhoneAuthCredential, String) -> Unit)? = null
 ) {
@@ -135,9 +138,10 @@ fun AuthScreen(
     var adminPasswordVisible by remember { mutableStateOf(false) }
 
     // Reset Password Form State
-    var resetPhone by remember { mutableStateOf("") }
-    var resetNewPassword by remember { mutableStateOf("") }
-    var resetPasswordVisible by remember { mutableStateOf(false) }
+    var resetEmailInput by remember { mutableStateOf("") }
+    var resetStatusMessage by remember { mutableStateOf<String?>(null) }
+    var resetErrorMessage by remember { mutableStateOf<String?>(null) }
+    var isResetSending by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -231,7 +235,7 @@ fun AuthScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Set a new secure password using your phone number",
+                        text = "Receive a secure reset link via email",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -308,18 +312,38 @@ fun AuthScreen(
 
                 AuthMode.RESET_PASSWORD -> {
                         ResetPasswordFormContent(
-                            phone = resetPhone,
-                            newPassword = resetNewPassword,
-                            passwordVisible = resetPasswordVisible,
-                            onPhoneChange = { resetPhone = it },
-                            onNewPasswordChange = { resetNewPassword = it },
-                            onTogglePasswordVisibility = { resetPasswordVisible = !resetPasswordVisible },
-                            onSubmit = {
-                                focusManager.clearFocus()
-                                onSelfResetPassword(resetPhone, resetNewPassword)
+                            email = resetEmailInput,
+                            onEmailChange = {
+                                resetEmailInput = it
+                                resetErrorMessage = null
+                                resetStatusMessage = null
                             },
-                            onBackToLogin = { authMode = AuthMode.LOGIN },
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            statusMessage = resetStatusMessage,
+                            errorMessage = resetErrorMessage,
+                            isSending = isResetSending,
+                            onSubmitResetEmail = {
+                                focusManager.clearFocus()
+                                val trimmed = resetEmailInput.trim()
+                                if (trimmed.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(trimmed).matches()) {
+                                    resetErrorMessage = "Please enter a valid email address (e.g. name@barstock.com)."
+                                    return@ResetPasswordFormContent
+                                }
+                                isResetSending = true
+                                resetErrorMessage = null
+                                resetStatusMessage = null
+                                onSendPasswordResetEmail?.invoke(
+                                    trimmed,
+                                    { msg ->
+                                        isResetSending = false
+                                        resetStatusMessage = msg
+                                    },
+                                    { err ->
+                                        isResetSending = false
+                                        resetErrorMessage = err
+                                    }
+                                )
+                            },
+                            onBackToLogin = { authMode = AuthMode.LOGIN }
                         )
                     }
                 }
@@ -695,36 +719,15 @@ private fun RegisterBarFormContent(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            OutlinedTextField(
+            StrongPasswordField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Admin Password *") },
-                placeholder = { Text("Min 4 characters") },
-                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = onTogglePasswordVisibility) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (passwordVisible) "Hide" else "Show"
-                        )
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("reg_admin_password_input"),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AmberPrimary,
-                    focusedLabelColor = AmberPrimary,
-                    cursorColor = AmberPrimary
-                )
+                label = "Admin Password *",
+                placeholder = "Min 8 chars, 1 uppercase, 1 digit, 1 special",
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "reg_admin_password_input",
+                imeAction = ImeAction.Done,
+                onDone = { onSubmit() }
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -766,15 +769,13 @@ private fun RegisterBarFormContent(
 
 @Composable
 private fun ResetPasswordFormContent(
-    phone: String,
-    newPassword: String,
-    passwordVisible: Boolean,
-    onPhoneChange: (String) -> Unit,
-    onNewPasswordChange: (String) -> Unit,
-    onTogglePasswordVisibility: () -> Unit,
-    onSubmit: () -> Unit,
-    onBackToLogin: () -> Unit,
-    onNext: () -> Unit
+    email: String,
+    onEmailChange: (String) -> Unit,
+    statusMessage: String?,
+    errorMessage: String?,
+    isSending: Boolean,
+    onSubmitResetEmail: () -> Unit,
+    onBackToLogin: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -787,55 +788,65 @@ private fun ResetPasswordFormContent(
                 .fillMaxWidth()
                 .padding(22.dp)
         ) {
-            OutlinedTextField(
-                value = phone,
-                onValueChange = onPhoneChange,
-                label = { Text("Registered Email or Phone Number *") },
-                placeholder = { Text("e.g. admin@bar.com or +254700123456") },
-                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(onNext = { onNext() }),
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("reset_phone_input"),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AmberPrimary,
-                    focusedLabelColor = AmberPrimary,
-                    cursorColor = AmberPrimary
-                )
+            Text(
+                text = "Enter your account email address below. Firebase Authentication will send a secure password reset link to your email inbox.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            if (statusMessage != null) {
+                Surface(
+                    color = EmeraldGreen.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldGreen),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 14.dp)
+                ) {
+                    Text(
+                        text = statusMessage,
+                        fontSize = 12.sp,
+                        color = EmeraldGreen,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            if (errorMessage != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 14.dp)
+                ) {
+                    Text(
+                        text = errorMessage,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
 
             OutlinedTextField(
-                value = newPassword,
-                onValueChange = onNewPasswordChange,
-                label = { Text("New Password *") },
-                placeholder = { Text("Min 4 characters") },
-                leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = onTogglePasswordVisibility) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (passwordVisible) "Hide" else "Show"
-                        )
-                    }
-                },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                value = email,
+                onValueChange = onEmailChange,
+                label = { Text("Registered Email Address *") },
+                placeholder = { Text("e.g. admin@barstock.com") },
+                leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
+                    keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                keyboardActions = KeyboardActions(onDone = { onSubmitResetEmail() }),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("reset_new_password_input"),
+                    .testTag("reset_email_input"),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AmberPrimary,
@@ -847,7 +858,8 @@ private fun ResetPasswordFormContent(
             Spacer(modifier = Modifier.height(18.dp))
 
             Button(
-                onClick = onSubmit,
+                onClick = onSubmitResetEmail,
+                enabled = !isSending && email.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AmberPrimary,
                     contentColor = Color.Black
@@ -858,13 +870,23 @@ private fun ResetPasswordFormContent(
                     .height(52.dp)
                     .testTag("submit_reset_password_button")
             ) {
-                Icon(Icons.Filled.LockReset, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Update Password & Sign In",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
-                )
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sending Reset Link...", fontWeight = FontWeight.Bold, color = Color.Black)
+                } else {
+                    Icon(Icons.Filled.LockReset, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Send Password Reset Link",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

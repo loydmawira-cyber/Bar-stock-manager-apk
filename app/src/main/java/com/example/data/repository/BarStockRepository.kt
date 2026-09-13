@@ -23,6 +23,7 @@ import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
 import com.example.data.model.VerificationStatus
+import com.example.data.util.PasswordValidator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
@@ -70,7 +71,11 @@ class BarStockRepository(private val dao: BarStockDao) {
         return null
     }
 
-    suspend fun registerUser(name: String, email: String, phone: String, role: UserRole, password: String = "123456"): Long {
+    suspend fun registerUser(name: String, email: String, phone: String, role: UserRole, password: String): Long {
+        val validation = PasswordValidator.validate(password)
+        if (!validation.isValid) {
+            throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
+        }
         val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
         try {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
@@ -103,8 +108,12 @@ class BarStockRepository(private val dao: BarStockDao) {
 
 
     suspend fun createAttendantByAdmin(name: String, email: String, phone: String, initialPassword: String): Long {
+        val validation = PasswordValidator.validate(initialPassword)
+        if (!validation.isValid) {
+            throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
+        }
         val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
-        val pass = initialPassword.ifBlank { "123456" }
+        val pass = initialPassword
         try {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, pass).await()
@@ -147,6 +156,40 @@ class BarStockRepository(private val dao: BarStockDao) {
         
 }
 
+
+    suspend fun sendPasswordResetEmail(email: String): Result<String> {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            return Result.failure(IllegalArgumentException("Please enter a valid email address."))
+        }
+
+        return try {
+            FirebaseAuth.getInstance().sendPasswordResetEmail(trimmedEmail).await()
+            Result.success("If an account exists for $trimmedEmail, a password reset link has been sent to your email. Please check your inbox.")
+        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidCredentialsException) {
+            Result.failure(Exception("Invalid email format. Please enter a valid email address."))
+        } catch (e: com.google.firebase.auth.FirebaseAuthInvalidUserException) {
+            // Prevent user enumeration attack by returning generic success message
+            Result.success("If an account exists for $trimmedEmail, a password reset link has been sent to your email. Please check your inbox.")
+        } catch (e: com.google.firebase.FirebaseNetworkException) {
+            Result.failure(Exception("Network error. Please check your internet connection and try again."))
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            if (e.errorCode == "ERROR_TOO_MANY_REQUESTS" || e.message?.contains("TOO_MANY_ATTEMPTS", ignoreCase = true) == true) {
+                Result.failure(Exception("Too many reset attempts. Please wait a few minutes before trying again."))
+            } else if (e.errorCode == "ERROR_USER_NOT_FOUND") {
+                Result.success("If an account exists for $trimmedEmail, a password reset link has been sent to your email. Please check your inbox.")
+            } else {
+                Result.failure(Exception(e.localizedMessage ?: "Failed to send reset email."))
+            }
+        } catch (e: Exception) {
+            if (e.message?.contains("user-not-found", ignoreCase = true) == true ||
+                e.message?.contains("NO_SUCH_USER", ignoreCase = true) == true) {
+                Result.success("If an account exists for $trimmedEmail, a password reset link has been sent to your email. Please check your inbox.")
+            } else {
+                Result.failure(Exception(e.localizedMessage ?: "Failed to send reset email."))
+            }
+        }
+    }
 
     suspend fun resetPasswordByIdentifier(identifier: String, newPassword: String): Result<User> {
         val trimmed = identifier.trim()

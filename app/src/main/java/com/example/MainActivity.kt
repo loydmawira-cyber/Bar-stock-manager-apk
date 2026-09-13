@@ -226,6 +226,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         },
                         onSelfResetPassword = { phone, newPassword ->
                             viewModel.selfResetPassword(phone, newPassword)
+                        },
+                        onSendPasswordResetEmail = { email, onSuccess, onError ->
+                            viewModel.sendPasswordResetEmail(email, onSuccess, onError)
                         }
                     )
                 }

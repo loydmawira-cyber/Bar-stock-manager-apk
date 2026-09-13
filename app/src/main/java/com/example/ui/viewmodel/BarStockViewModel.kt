@@ -27,6 +27,7 @@ import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
 import com.example.data.repository.BarStockRepository
 import com.example.data.repository.BackupService
+import com.example.data.util.PasswordValidator
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -365,6 +366,11 @@ class BarStockViewModel(
                 _toastMessage.emit("Admin Email is compulsory and must be a valid email (used to reset password).")
                 return@launch
             }
+            val validation = PasswordValidator.validate(password.trim())
+            if (!validation.isValid) {
+                _toastMessage.emit("Password error: ${validation.missingRequirementsMessage}")
+                return@launch
+            }
             val current = barProfile.value
             val updated = current.copy(
                 barName = barName.trim(),
@@ -431,16 +437,25 @@ class BarStockViewModel(
         }
     }
 
-    fun registerAttendant(name: String, email: String, phone: String, password: String = "123456") {
+    fun registerAttendant(name: String, email: String, phone: String, password: String) {
         viewModelScope.launch {
             if (name.isBlank() || phone.isBlank()) {
                 _toastMessage.emit("Please enter your name and phone number.")
                 return@launch
             }
-            repository.registerUser(name, email, phone, UserRole.ATTENDANT, password)
-            autoBackup()
-            _toastMessage.emit("Registration submitted! Account is pending admin approval.")
-            _currentScreen.value = AppScreen.AUTH
+            val validation = PasswordValidator.validate(password)
+            if (!validation.isValid) {
+                _toastMessage.emit("Password error: ${validation.missingRequirementsMessage}")
+                return@launch
+            }
+            try {
+                repository.registerUser(name, email, phone, UserRole.ATTENDANT, password)
+                autoBackup()
+                _toastMessage.emit("Registration submitted! Account is pending admin approval.")
+                _currentScreen.value = AppScreen.AUTH
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Registration failed")
+            }
         }
     }
 
@@ -451,10 +466,18 @@ class BarStockViewModel(
                 _toastMessage.emit("Attendant Name and Phone Number are required.")
                 return@launch
             }
-            val password = initialPassword.ifBlank { "123456" }
-            repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), password.trim())
-            autoBackup()
-            _toastMessage.emit("Attendant account created for $name with password.")
+            val validation = PasswordValidator.validate(initialPassword)
+            if (!validation.isValid) {
+                _toastMessage.emit("Password error: ${validation.missingRequirementsMessage}")
+                return@launch
+            }
+            try {
+                repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), initialPassword.trim())
+                autoBackup()
+                _toastMessage.emit("Attendant account created for $name with strong password.")
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Attendant creation failed")
+            }
         }
     }
 
@@ -503,6 +526,30 @@ class BarStockViewModel(
                 onSuccess()
             }.onFailure { error ->
                 val msg = error.message ?: "Failed to update password."
+                _toastMessage.emit(msg)
+                onError(msg)
+            }
+        }
+    }
+
+    fun sendPasswordResetEmail(
+        email: String,
+        onSuccess: (String) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            if (email.isBlank()) {
+                val msg = "Please enter your registered account email."
+                _toastMessage.emit(msg)
+                onError(msg)
+                return@launch
+            }
+            val result = repository.sendPasswordResetEmail(email)
+            result.onSuccess { successMsg ->
+                _toastMessage.emit(successMsg)
+                onSuccess(successMsg)
+            }.onFailure { error ->
+                val msg = error.message ?: "Failed to send password reset email."
                 _toastMessage.emit(msg)
                 onError(msg)
             }
