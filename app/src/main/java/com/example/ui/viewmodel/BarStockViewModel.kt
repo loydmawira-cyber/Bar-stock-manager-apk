@@ -244,6 +244,9 @@ class BarStockViewModel(
         viewModelScope.launch {
             try {
                 FirebaseAuth.getInstance().signInWithCredential(credential).await()
+                // Restore the bar identified by this phone before reading the
+                // local user; otherwise an old local database can win.
+                backupService.syncData(phone.trim())
                 val localUser = repository.getUserByPhone(phone)
                 if (localUser != null) {
                     loginUser(localUser)
