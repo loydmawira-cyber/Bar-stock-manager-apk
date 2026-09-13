@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -87,6 +89,7 @@ import com.example.ui.theme.EmeraldGreen
 import com.example.ui.theme.SkyBlue
 import com.example.ui.viewmodel.AppScreen
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AttendantDashboardScreen(
     barProfile: BarProfile,
@@ -118,7 +121,7 @@ fun AttendantDashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Establishment & Attendant Profile Card
-        item {
+        stickyHeader {
             Spacer(modifier = Modifier.height(4.dp))
 
             Card(
