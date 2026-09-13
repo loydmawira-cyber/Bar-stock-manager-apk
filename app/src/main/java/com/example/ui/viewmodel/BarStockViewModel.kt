@@ -499,7 +499,9 @@ class BarStockViewModel(
             }
             try {
                 repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), initialPassword.trim())
-                autoBackup()
+                // Do not let the attendant log in before the updated bar
+                // snapshot (including this attendant) is in Firestore.
+                backupService.backupData().getOrThrow()
                 _toastMessage.emit("Attendant account created for $name with strong password.")
             } catch (e: Exception) {
                 _toastMessage.emit(e.message ?: "Attendant creation failed")
