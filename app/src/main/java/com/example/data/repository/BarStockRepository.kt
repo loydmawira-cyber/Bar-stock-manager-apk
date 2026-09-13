@@ -153,23 +153,14 @@ class BarStockRepository(private val dao: BarStockDao) {
                 return null
             }
         } else {
-            // User not found in local DAO. Attempt Firebase Auth directly
+            // Authenticate the Firebase account, but do not create a local user yet.
+            // The caller must restore the matching bar backup first; otherwise a
+            // missing local user could incorrectly be created as ADMIN.
             try {
                 if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedIdentifier).matches()) {
-                    val authResult = FirebaseAuth.getInstance().signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword).await()
-                    val fbUser = authResult.user
-                    if (fbUser != null) {
-                        val newUser = User(
-                            name = fbUser.displayName ?: trimmedIdentifier.substringBefore("@"),
-                            email = trimmedIdentifier,
-                            phone = fbUser.phoneNumber ?: "",
-                            password = trimmedPassword,
-                            role = UserRole.ADMIN,
-                            status = UserStatus.APPROVED
-                        )
-                        val id = dao.insertUser(newUser)
-                        return newUser.copy(id = id)
-                    }
+                    FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword)
+                        .await()
                 }
             } catch (e: Exception) {
                 // Firebase sign-in failed
@@ -366,6 +357,11 @@ class BarStockRepository(private val dao: BarStockDao) {
             ?: return Result.failure(Exception("No account registered with '$trimmed'"))
         if (newPassword.length < 4) {
             return Result.failure(Exception("Password must be at least 4 characters"))
+        }
+        if (android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+            return Result.failure(
+                Exception("Email passwords must be reset using the password-reset link sent to ${user.email}.")
+            )
         }
         dao.updateUserPassword(user.id, newPassword)
         return Result.success(user)
