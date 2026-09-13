@@ -337,6 +337,9 @@ interface BarStockDao {
     @Query("DELETE FROM reconciliations")
     suspend fun clearReconciliations()
     
+    @Query("DELETE FROM bar_profile")
+    suspend fun clearBarProfile()
+
     @Query("DELETE FROM app_notifications")
     suspend fun clearNotifications()
 }
