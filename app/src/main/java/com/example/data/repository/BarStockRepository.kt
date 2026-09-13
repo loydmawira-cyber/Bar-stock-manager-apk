@@ -46,8 +46,70 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     suspend fun saveBarProfile(profile: BarProfile) {
         dao.insertOrUpdateBarProfile(profile)
-        
-}
+    }
+
+    suspend fun clearAllDataForNewBar() {
+        dao.clearNotifications()
+        dao.clearReconciliations()
+        dao.clearStockAdjustments()
+        dao.clearDisputes()
+        dao.clearShiftClosings()
+        dao.clearStockVerifications()
+        dao.clearShifts()
+        dao.clearCounterStocks()
+        dao.clearCounters()
+        dao.clearItems()
+        dao.clearUsers()
+    }
+
+    suspend fun seedInitialCounterForNewBar() {
+        dao.insertCounter(
+            com.example.data.model.Counter(
+                id = 1L,
+                name = "Main Bar Counter",
+                location = "Main Bar Area"
+            )
+        )
+    }
+
+    suspend fun seedSampleBeersForNewBar(counterId: Long = 1L) {
+        val beers = listOf(
+            Item(name = "Tusker Lager (500ml)", category = ItemCategory.BEER, unitPrice = 250.0, casePrice = 6000.0, unitType = "Bottle", description = "Classic Kenyan Lager"),
+            Item(name = "Tusker Malt (500ml)", category = ItemCategory.BEER, unitPrice = 280.0, casePrice = 6720.0, unitType = "Bottle", description = "Premium Malt Lager"),
+            Item(name = "Tusker Cider (500ml)", category = ItemCategory.BEER, unitPrice = 300.0, casePrice = 7200.0, unitType = "Bottle", description = "Crisp Apple Cider"),
+            Item(name = "Tusker Lite (500ml)", category = ItemCategory.BEER, unitPrice = 280.0, casePrice = 6720.0, unitType = "Bottle", description = "Low carb light lager"),
+            Item(name = "Guinness Foreign Extra Stout (500ml)", category = ItemCategory.BEER, unitPrice = 300.0, casePrice = 7200.0, unitType = "Bottle", description = "Rich dark stout"),
+            Item(name = "Heineken Lager (330ml)", category = ItemCategory.BEER, unitPrice = 320.0, casePrice = 7680.0, unitType = "Bottle", description = "International premium malt"),
+            Item(name = "White Cap Lager (500ml)", category = ItemCategory.BEER, unitPrice = 260.0, casePrice = 6240.0, unitType = "Bottle", description = "Smooth crisp lager"),
+            Item(name = "White Cap Light (500ml)", category = ItemCategory.BEER, unitPrice = 260.0, casePrice = 6240.0, unitType = "Bottle", description = "Light refreshing lager"),
+            Item(name = "Balozi Lager (500ml)", category = ItemCategory.BEER, unitPrice = 230.0, casePrice = 5520.0, unitType = "Bottle", description = "Rich unpasteurized lager"),
+            Item(name = "Pilsner Lager (500ml)", category = ItemCategory.BEER, unitPrice = 250.0, casePrice = 6000.0, unitType = "Bottle", description = "Bold Simba lager"),
+            Item(name = "Pilsner Ice (500ml)", category = ItemCategory.BEER, unitPrice = 260.0, casePrice = 6240.0, unitType = "Bottle", description = "Ice filtered lager"),
+            Item(name = "Corona Extra (355ml)", category = ItemCategory.BEER, unitPrice = 380.0, casePrice = 9120.0, unitType = "Bottle", description = "Mexican pale lager"),
+            Item(name = "Stella Artois (330ml)", category = ItemCategory.BEER, unitPrice = 350.0, casePrice = 8400.0, unitType = "Bottle", description = "Belgian pilsner"),
+            Item(name = "Budweiser (330ml)", category = ItemCategory.BEER, unitPrice = 320.0, casePrice = 7680.0, unitType = "Bottle", description = "American king of beers"),
+            Item(name = "Carlsberg Elephant (330ml)", category = ItemCategory.BEER, unitPrice = 340.0, casePrice = 8160.0, unitType = "Bottle", description = "Strong Danish lager"),
+            Item(name = "Windhoek Lager (330ml)", category = ItemCategory.BEER, unitPrice = 300.0, casePrice = 7200.0, unitType = "Bottle", description = "100% Pure Namibian beer"),
+            Item(name = "Windhoek Draught (440ml)", category = ItemCategory.BEER, unitPrice = 330.0, casePrice = 7920.0, unitType = "Can", description = "Smooth draught beer"),
+            Item(name = "Savanna Dry Cider (330ml)", category = ItemCategory.BEER, unitPrice = 320.0, casePrice = 7680.0, unitType = "Bottle", description = "Dry apple cider"),
+            Item(name = "Hunters Gold Cider (330ml)", category = ItemCategory.BEER, unitPrice = 300.0, casePrice = 7200.0, unitType = "Bottle", description = "Real golden cider"),
+            Item(name = "Desperados Tequila Beer (330ml)", category = ItemCategory.BEER, unitPrice = 360.0, casePrice = 8640.0, unitType = "Bottle", description = "Tequila flavored beer")
+        )
+
+        val stocks = mutableListOf<CounterStock>()
+        for (beer in beers) {
+            val itemId = dao.insertItem(beer)
+            stocks.add(
+                CounterStock(
+                    counterId = counterId,
+                    itemId = itemId,
+                    currentQuantity = 24, // 1 case initial stock
+                    minThreshold = 6
+                )
+            )
+        }
+        dao.insertCounterStocks(stocks)
+    }
 
 
     // --- Users ---
@@ -59,13 +121,57 @@ class BarStockRepository(private val dao: BarStockDao) {
     suspend fun getUserByEmail(email: String): User? = dao.getUserByEmail(email)
 
     suspend fun authenticateUser(identifier: String, password: String): User? {
-        val user = dao.getUserByIdentifier(identifier.trim())
+        val trimmedIdentifier = identifier.trim()
+        val trimmedPassword = password.trim()
+        val user = dao.getUserByIdentifier(trimmedIdentifier)
+
         if (user != null) {
-            if (android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
-                FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, password.trim()).await()
-            }
-            if (user.password == password.trim()) {
+            // Check local password match
+            if (user.password == trimmedPassword) {
+                // Best-effort Firebase sign-in to sync session, ignoring errors if offline or not in Firebase
+                try {
+                    if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+                        FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                    }
+                } catch (e: Exception) {
+                    // Suppress Firebase Auth exceptions so local login continues working
+                }
                 return user
+            } else {
+                // Local password didn't match directly. Try Firebase Auth (in case password was updated elsewhere)
+                try {
+                    if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
+                        FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                        // Firebase sign-in succeeded! Update local password
+                        dao.updateUserPassword(user.id, trimmedPassword)
+                        return user.copy(password = trimmedPassword)
+                    }
+                } catch (e: Exception) {
+                    // Firebase sign-in failed
+                }
+                return null
+            }
+        } else {
+            // User not found in local DAO. Attempt Firebase Auth directly
+            try {
+                if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedIdentifier).matches()) {
+                    val authResult = FirebaseAuth.getInstance().signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword).await()
+                    val fbUser = authResult.user
+                    if (fbUser != null) {
+                        val newUser = User(
+                            name = fbUser.displayName ?: trimmedIdentifier.substringBefore("@"),
+                            email = trimmedIdentifier,
+                            phone = fbUser.phoneNumber ?: "",
+                            password = trimmedPassword,
+                            role = UserRole.ADMIN,
+                            status = UserStatus.APPROVED
+                        )
+                        val id = dao.insertUser(newUser)
+                        return newUser.copy(id = id)
+                    }
+                }
+            } catch (e: Exception) {
+                // Firebase sign-in failed
             }
         }
         return null
@@ -76,12 +182,40 @@ class BarStockRepository(private val dao: BarStockDao) {
         if (!validation.isValid) {
             throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
         }
-        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
+        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }.trim()
+
+        // 1. Check if user already exists locally
+        val existingByEmail = dao.getUserByIdentifier(finalEmail)
+        if (existingByEmail != null) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already registered to an account.")
+        }
+        if (phone.isNotBlank()) {
+            val existingByPhone = dao.getUserByIdentifier(phone.trim())
+            if (existingByPhone != null) {
+                throw IllegalArgumentException("The phone number '${phone.trim()}' is already registered to an account.")
+            }
+        }
+
+        // 2. Create user in Firebase Authentication
         try {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, password).await()
             }
-        } catch (e: Exception) {}
+        } catch (e: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            if (e.errorCode == "ERROR_EMAIL_ALREADY_IN_USE" || e.message?.contains("already in use", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            } else {
+                throw IllegalArgumentException(e.localizedMessage ?: "Failed to create account.")
+            }
+        } catch (e: Exception) {
+            if (e.message?.contains("already in use", ignoreCase = true) == true ||
+                e.message?.contains("EMAIL_EXISTS", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            }
+        }
+
         val user = User(
             name = name,
             role = role,
@@ -103,22 +237,47 @@ class BarStockRepository(private val dao: BarStockDao) {
             )
         }
         return id
-        
-}
-
+    }
 
     suspend fun createAttendantByAdmin(name: String, email: String, phone: String, initialPassword: String): Long {
         val validation = PasswordValidator.validate(initialPassword)
         if (!validation.isValid) {
             throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
         }
-        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }
+        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }.trim()
         val pass = initialPassword
+
+        // Check local DB
+        val existingByEmail = dao.getUserByIdentifier(finalEmail)
+        if (existingByEmail != null) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already registered to an account.")
+        }
+        if (phone.isNotBlank()) {
+            val existingByPhone = dao.getUserByIdentifier(phone.trim())
+            if (existingByPhone != null) {
+                throw IllegalArgumentException("The phone number '${phone.trim()}' is already registered to an account.")
+            }
+        }
+
         try {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, pass).await()
             }
-        } catch (e: Exception) {}
+        } catch (e: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            if (e.errorCode == "ERROR_EMAIL_ALREADY_IN_USE" || e.message?.contains("already in use", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            } else {
+                throw IllegalArgumentException(e.localizedMessage ?: "Failed to create account.")
+            }
+        } catch (e: Exception) {
+            if (e.message?.contains("already in use", ignoreCase = true) == true ||
+                e.message?.contains("EMAIL_EXISTS", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            }
+        }
+
         val user = User(
             name = name,
             role = UserRole.ATTENDANT,
@@ -139,8 +298,7 @@ class BarStockRepository(private val dao: BarStockDao) {
             )
         )
         return id
-        
-}
+    }
 
 
     suspend fun changeUserPassword(userId: Long, oldPassword: String?, newPassword: String): Result<Unit> {

@@ -264,33 +264,38 @@ class BarStockViewModel(
                 return@launch
             }
 
-            // 1. Try local authentication first (instant and reliable)
-            val localUser = repository.authenticateUser(identifier.trim(), password.trim())
-            if (localUser != null) {
-                loginUser(localUser)
-                // Sync cloud in background without blocking login
-                autoSync()
-                return@launch
-            }
-
-            // 2. If not found locally, attempt to retrieve cloud tenant data for this user
-            _isSyncing.value = true
             try {
-                val syncResult = backupService.syncData(identifier.trim())
-                if (syncResult.isSuccess) {
-                    val syncedUser = repository.authenticateUser(identifier.trim(), password.trim())
-                    if (syncedUser != null) {
-                        loginUser(syncedUser)
-                        return@launch
-                    }
+                // 1. Try local/Firebase authentication first (instant and reliable)
+                val localUser = repository.authenticateUser(identifier.trim(), password.trim())
+                if (localUser != null) {
+                    loginUser(localUser)
+                    // Sync cloud in background without blocking login
+                    autoSync()
+                    return@launch
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _isSyncing.value = false
-            }
 
-            _toastMessage.emit("Invalid credentials. Please verify your email/phone and password.")
+                // 2. If not found locally, attempt to retrieve cloud tenant data for this user
+                _isSyncing.value = true
+                try {
+                    val syncResult = backupService.syncData(identifier.trim())
+                    if (syncResult.isSuccess) {
+                        val syncedUser = repository.authenticateUser(identifier.trim(), password.trim())
+                        if (syncedUser != null) {
+                            loginUser(syncedUser)
+                            return@launch
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    _isSyncing.value = false
+                }
+
+                _toastMessage.emit("Invalid credentials. Please verify your email/phone and password.")
+            } catch (e: Exception) {
+                _isSyncing.value = false
+                _toastMessage.emit("Login failed: ${e.message ?: "Invalid email/phone or password."}")
+            }
         }
     }
 
@@ -371,34 +376,44 @@ class BarStockViewModel(
                 _toastMessage.emit("Password error: ${validation.missingRequirementsMessage}")
                 return@launch
             }
-            val current = barProfile.value
-            val updated = current.copy(
-                barName = barName.trim(),
-                location = location.trim(),
-                managerName = adminName.trim(),
-                contactPhone = phone.trim(),
-                isRegistered = true,
-                updatedAt = System.currentTimeMillis()
-            )
-            repository.saveBarProfile(updated)
+            try {
+                // Clear previous bar's local data to ensure total data isolation for the new bar
+                repository.clearAllDataForNewBar()
 
-            val adminId = repository.registerUser(
-                name = adminName.trim(),
-                email = email.trim(),
-                phone = phone.trim(),
-                role = UserRole.ADMIN,
-                password = password.trim()
-            )
+                val current = barProfile.value
+                val updated = current.copy(
+                    id = 1L,
+                    barName = barName.trim(),
+                    location = location.trim(),
+                    managerName = adminName.trim(),
+                    contactPhone = phone.trim(),
+                    isRegistered = true,
+                    updatedAt = System.currentTimeMillis()
+                )
+                repository.saveBarProfile(updated)
+                repository.seedInitialCounterForNewBar()
+                repository.seedSampleBeersForNewBar()
 
-            autoBackup()
+                val adminId = repository.registerUser(
+                    name = adminName.trim(),
+                    email = email.trim(),
+                    phone = phone.trim(),
+                    role = UserRole.ADMIN,
+                    password = password.trim()
+                )
 
-            val newAdminUser = repository.getUserById(adminId)
-            if (newAdminUser != null) {
-                _currentUser.value = newAdminUser
-                _currentScreen.value = AppScreen.ADMIN_DASHBOARD
-                _toastMessage.emit("Bar/Club '${barName.trim()}' registered! Welcome Admin ${adminName.trim()}.")
-            } else {
-                _toastMessage.emit("Bar/Club registered successfully! Please log in.")
+                autoBackup()
+
+                val newAdminUser = repository.getUserById(adminId)
+                if (newAdminUser != null) {
+                    _currentUser.value = newAdminUser
+                    _currentScreen.value = AppScreen.ADMIN_DASHBOARD
+                    _toastMessage.emit("Bar/Club '${barName.trim()}' registered! Welcome Admin ${adminName.trim()}.")
+                } else {
+                    _toastMessage.emit("Bar/Club registered successfully! Please log in.")
+                }
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Registration failed")
             }
         }
     }

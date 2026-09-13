@@ -97,8 +97,7 @@ import com.example.ui.theme.EmeraldGreen
 enum class AuthMode {
     LOGIN,
     REGISTER_BAR,
-    RESET_PASSWORD,
-    PHONE_AUTH
+    RESET_PASSWORD
 }
 
 @Composable
@@ -214,19 +213,6 @@ fun AuthScreen(
                         modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
                     )
                 }
-                AuthMode.PHONE_AUTH -> {
-                    Text(
-                        text = "Phone Sign In",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Verify your number via SMS",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 AuthMode.RESET_PASSWORD -> {
                     Text(
                         text = "Reset Password",
@@ -265,7 +251,6 @@ fun AuthScreen(
                             },
                             onForgotPassword = { authMode = AuthMode.RESET_PASSWORD },
                             onRegisterBar = { authMode = AuthMode.REGISTER_BAR },
-                            onPhoneLogin = { authMode = AuthMode.PHONE_AUTH },
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         )
                     }
@@ -302,15 +287,7 @@ fun AuthScreen(
                         )
                     }
 
-                    AuthMode.PHONE_AUTH -> {
-                        PhoneAuthContent(
-                            phoneAuthManager = phoneAuthManager,
-                            onLoginPhoneCredential = onLoginPhoneCredential,
-                            onBackToLogin = { authMode = AuthMode.LOGIN }
-                        )
-                    }
-
-                AuthMode.RESET_PASSWORD -> {
+                    AuthMode.RESET_PASSWORD -> {
                         ResetPasswordFormContent(
                             email = resetEmailInput,
                             onEmailChange = {
@@ -365,7 +342,6 @@ private fun LoginFormContent(
     onSubmit: () -> Unit,
     onForgotPassword: () -> Unit,
     onRegisterBar: () -> Unit,
-    onPhoneLogin: () -> Unit,
     onNext: () -> Unit
 ) {
     Card(
@@ -491,27 +467,6 @@ private fun LoginFormContent(
                     text = "Sign In",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            OutlinedButton(
-                onClick = onPhoneLogin,
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                modifier = Modifier.fillMaxWidth().height(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Phone,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Sign In with Phone SMS",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
                 )
             }
 
