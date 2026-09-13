@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "bar_profile")
 data class BarProfile(
     @PrimaryKey val id: Long = 1L,
+    val barId: String = java.util.UUID.randomUUID().toString(),
     val barName: String = "The Amber Taphouse & Lounge",
     val location: String = "42 High Street, Downtown",
     val iconType: String = "cocktail", // "cocktail", "beer", "wine", "whiskey", "neon", "vip"
