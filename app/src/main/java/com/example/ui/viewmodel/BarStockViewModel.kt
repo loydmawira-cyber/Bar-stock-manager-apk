@@ -342,6 +342,7 @@ class BarStockViewModel(
             try {
                 // Ensure latest local snapshot is saved to cloud before clearing user
                 backupService.backupData()
+                repository.clearAllDataForNewBar()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -380,8 +381,7 @@ class BarStockViewModel(
                 // Clear previous bar's local data to ensure total data isolation for the new bar
                 repository.clearAllDataForNewBar()
 
-                val current = barProfile.value
-                val updated = current.copy(
+                val updated = com.example.data.model.BarProfile(
                     id = 1L,
                     barName = barName.trim(),
                     location = location.trim(),
