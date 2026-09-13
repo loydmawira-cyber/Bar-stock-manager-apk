@@ -398,7 +398,7 @@ fun UserManagementScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Provide the attendant's details. Attendants use their phone number to log in and reset passwords. Email is optional.",
+                        text = "Provide the attendant's unique email and phone number. These identifiers cannot be reused by another bar.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -437,7 +437,7 @@ fun UserManagementScreen(
                     OutlinedTextField(
                         value = newEmail,
                         onValueChange = { newEmail = it },
-                        label = { Text("Email (Optional)") },
+                        label = { Text("Unique Email *") },
                         leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier
@@ -464,7 +464,7 @@ fun UserManagementScreen(
                 val passwordValid = PasswordValidator.validate(newPassword).isValid
                 Button(
                     onClick = {
-                        if (newName.isNotBlank() && newPhone.isNotBlank() && passwordValid) {
+                        if (newName.isNotBlank() && newEmail.isNotBlank() && newPhone.isNotBlank() && passwordValid) {
                             onCreateAttendant(newName, newEmail, newPhone, newPassword)
                             showCreateDialog = false
                         }
