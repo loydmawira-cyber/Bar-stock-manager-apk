@@ -20,6 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AttachMoney
@@ -126,27 +130,92 @@ fun AttendantDashboardScreen(
                     .testTag("attendant_bar_profile_card")
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                    if (!barProfile.customPhotoUri.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(14.dp))
                         ) {
-                            BarLogoIcon(
-                                iconType = barProfile.iconType,
-                                size = 52.dp,
-                                iconSize = 28.dp
+                            AsyncImage(
+                                model = barProfile.customPhotoUri,
+                                contentDescription = barProfile.barName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.05f),
+                                                Color.Black.copy(alpha = 0.78f)
+                                            )
+                                        )
+                                    )
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onNavigate(AppScreen.NOTIFICATIONS) },
+                                    modifier = Modifier.testTag("attendant_banner_notifications_button")
+                                ) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (unreadNotificationsCount > 0) {
+                                                Badge(
+                                                    containerColor = AmberPrimary,
+                                                    contentColor = Color.Black
+                                                ) {
+                                                    Text(
+                                                        text = "$unreadNotificationsCount",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Notifications,
+                                            contentDescription = "Notifications",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onNavigate(AppScreen.BAR_PROFILE) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                    modifier = Modifier.testTag("attendant_banner_settings_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Settings,
+                                        contentDescription = "Settings",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(14.dp)
+                            ) {
                                 Text(
                                     text = barProfile.barName,
                                     fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 20.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    fontSize = 22.sp,
+                                    color = Color.White
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +229,7 @@ fun AttendantDashboardScreen(
                                     Text(
                                         text = barProfile.location.ifBlank { "Main Branch" },
                                         fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = Color.White.copy(alpha = 0.9f)
                                     )
                                 }
                                 Text(
@@ -172,54 +241,102 @@ fun AttendantDashboardScreen(
                                 )
                             }
                         }
-
-                        // Actions in Banner Header (Notifications & Settings)
+                    } else {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = { onNavigate(AppScreen.NOTIFICATIONS) },
-                                modifier = Modifier.testTag("attendant_banner_notifications_button")
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                BadgedBox(
-                                    badge = {
-                                        if (unreadNotificationsCount > 0) {
-                                            Badge(
-                                                containerColor = AmberPrimary,
-                                                contentColor = Color.Black
-                                            ) {
-                                                Text(
-                                                    text = "$unreadNotificationsCount",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.sp
-                                                )
-                                            }
-                                        }
+                                BarLogoIcon(
+                                    iconType = barProfile.iconType,
+                                    size = 52.dp,
+                                    iconSize = 28.dp
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column {
+                                    Text(
+                                        text = barProfile.barName,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 20.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Filled.LocationOn,
+                                            contentDescription = null,
+                                            tint = AmberPrimary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = barProfile.location.ifBlank { "Main Branch" },
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Notifications,
-                                        contentDescription = "Notifications",
-                                        tint = MaterialTheme.colorScheme.onSurface
+                                    Text(
+                                        text = "Attendant: ${currentUser.name}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = EmeraldGreen,
+                                        modifier = Modifier.padding(top = 2.dp)
                                     )
                                 }
                             }
 
-                            OutlinedButton(
-                                onClick = { onNavigate(AppScreen.BAR_PROFILE) },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, AmberPrimary),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
-                                modifier = Modifier.testTag("attendant_banner_settings_button")
+                            // Actions in Banner Header (Notifications & Settings)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Settings,
-                                    contentDescription = "Settings",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                IconButton(
+                                    onClick = { onNavigate(AppScreen.NOTIFICATIONS) },
+                                    modifier = Modifier.testTag("attendant_banner_notifications_button")
+                                ) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (unreadNotificationsCount > 0) {
+                                                Badge(
+                                                    containerColor = AmberPrimary,
+                                                    contentColor = Color.Black
+                                                ) {
+                                                    Text(
+                                                        text = "$unreadNotificationsCount",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Notifications,
+                                            contentDescription = "Notifications",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onNavigate(AppScreen.BAR_PROFILE) },
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, AmberPrimary),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
+                                    modifier = Modifier.testTag("attendant_banner_settings_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Settings,
+                                        contentDescription = "Settings",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
