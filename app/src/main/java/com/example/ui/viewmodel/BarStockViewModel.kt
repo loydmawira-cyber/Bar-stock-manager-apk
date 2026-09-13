@@ -343,6 +343,7 @@ class BarStockViewModel(
                 // Ensure latest local snapshot is saved to cloud before clearing user
                 backupService.backupData()
                 repository.clearAllDataForNewBar()
+                FirebaseAuth.getInstance().signOut()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -378,10 +379,6 @@ class BarStockViewModel(
                 return@launch
             }
             try {
-                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
-                    _toastMessage.emit("That admin email or phone number already belongs to another bar.")
-                    return@launch
-                }
                 // Clear previous bar's local data to ensure total data isolation for the new bar
                 repository.clearAllDataForNewBar()
 
@@ -468,10 +465,6 @@ class BarStockViewModel(
                 return@launch
             }
             try {
-                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
-                    _toastMessage.emit("That email or phone number already belongs to another bar.")
-                    return@launch
-                }
                 repository.registerUser(name, email, phone, UserRole.ATTENDANT, password)
                 autoBackup()
                 _toastMessage.emit("Registration submitted! Account is pending admin approval.")
@@ -495,10 +488,6 @@ class BarStockViewModel(
                 return@launch
             }
             try {
-                if (!backupService.credentialsAvailable(email, phone).getOrThrow()) {
-                    _toastMessage.emit("That email or phone number already belongs to another bar.")
-                    return@launch
-                }
                 repository.createAttendantByAdmin(name.trim(), email.trim(), phone.trim(), initialPassword.trim())
                 autoBackup()
                 _toastMessage.emit("Attendant account created for $name with strong password.")
