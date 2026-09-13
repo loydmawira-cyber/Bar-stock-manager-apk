@@ -127,10 +127,10 @@ abstract class BarStockDatabase : RoomDatabase() {
             )
 
             val items = listOf(
-                Item("Lager Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
-                Item("Premium Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
-                Item("Stout Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
-                Item("Cider 330ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", "")
+                Item(name = "Lager Beer 500ml", category = ItemCategory.BEER, unitPrice = 0.0, casePrice = 0.0, unitType = "Bottle"),
+                Item(name = "Premium Beer 500ml", category = ItemCategory.BEER, unitPrice = 0.0, casePrice = 0.0, unitType = "Bottle"),
+                Item(name = "Stout Beer 500ml", category = ItemCategory.BEER, unitPrice = 0.0, casePrice = 0.0, unitType = "Bottle"),
+                Item(name = "Cider 330ml", category = ItemCategory.BEER, unitPrice = 0.0, casePrice = 0.0, unitType = "Bottle")
             )
             val itemIds = items.map { dao.insertItem(it) }
             val counterId = dao.insertCounter(
