@@ -260,6 +260,12 @@ class BarStockRepository(private val dao: BarStockDao) {
             }
         }
 
+        // Firebase signs the current device into the newly created account.
+        // Save the admin session so creating an attendant does not log the admin out.
+        val auth = FirebaseAuth.getInstance()
+        val adminEmail = auth.currentUser?.email
+        val adminPassword = adminEmail?.let { dao.getUserByEmail(it)?.password }
+
         try {
             if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, pass).await()
@@ -277,6 +283,10 @@ class BarStockRepository(private val dao: BarStockDao) {
                 e.message?.contains("EMAIL_EXISTS", ignoreCase = true) == true) {
                 throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
             }
+        }
+
+        if (!adminEmail.isNullOrBlank() && !adminPassword.isNullOrBlank()) {
+            auth.signInWithEmailAndPassword(adminEmail, adminPassword).await()
         }
 
         val user = User(
