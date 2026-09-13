@@ -85,7 +85,8 @@ abstract class BarStockDatabase : RoomDatabase() {
                 INSTANCE?.let { database ->
                     scope.launch(Dispatchers.IO) {
                         val dao = database.barStockDao()
-                        if (dao.getUserByEmail("admin@savannahbar.co.ke") == null) {
+                        if (dao.getUserByEmail("admin@savannahbar.co.ke") != null) {
+                            clearLegacyDemoData(dao)
                             populateInitialData(dao)
                         }
                     }
@@ -93,353 +94,57 @@ abstract class BarStockDatabase : RoomDatabase() {
             }
         }
 
+        private suspend fun clearLegacyDemoData(dao: BarStockDao) {
+            dao.clearNotifications()
+            dao.clearReconciliations()
+            dao.clearStockAdjustments()
+            dao.clearDisputes()
+            dao.clearShiftClosings()
+            dao.clearStockVerifications()
+            dao.clearShifts()
+            dao.clearCounterStocks()
+            dao.clearCounters()
+            dao.clearItems()
+            dao.clearUsers()
+            dao.clearBarProfile()
+        }
+
         suspend fun populateInitialData(dao: BarStockDao) {
-            // Seed Bar Profile
+            // New installations start with only a starter profile, one counter,
+            // and beer products. No demo users, sales, shifts, or notifications.
             dao.insertOrUpdateBarProfile(
                 BarProfile(
                     id = 1L,
-                    barName = "The Savannah Taphouse & Lounge",
-                    location = "Waiyaki Way, Westlands, Nairobi",
-                    iconType = "cocktail",
-                    customPhotoUri = null,
-                    contactPhone = "+254 700 000 000",
-                    currencyCode = "KES",
-                    currencySymbol = "KSh",
-                    managerName = "Alex Mwangi",
-                    openingHours = "2:00 PM - 4:00 AM",
-                    isRegistered = true
+                    barName = "Your Bar",
+                    location = "",
+                    contactPhone = "",
+                    currencyCode = "USD",
+                    currencySymbol = "$",
+                    managerName = "",
+                    openingHours = "",
+                    isRegistered = false
                 )
             )
 
-            // Seed Users
-            val adminId = dao.insertUser(
-                User(
-                    name = "Alex Mwangi (Admin)",
-                    role = UserRole.ADMIN,
-                    status = UserStatus.APPROVED,
-                    email = "admin@savannahbar.co.ke",
-                    phone = "+254 711 000111",
-                    password = "admin"
-                )
+            val items = listOf(
+                Item("Lager Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
+                Item("Premium Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
+                Item("Stout Beer 500ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", ""),
+                Item("Cider 330ml", ItemCategory.BEER, 0.0, 0.0, "Bottle", "")
             )
-
-            val attendant1Id = dao.insertUser(
-                User(
-                    name = "John Kamau",
-                    role = UserRole.ATTENDANT,
-                    status = UserStatus.APPROVED,
-                    email = "john@savannahbar.co.ke",
-                    phone = "+254 722 000222",
-                    password = "pass"
-                )
+            val itemIds = items.map { dao.insertItem(it) }
+            val counterId = dao.insertCounter(
+                Counter(name = "Main Counter", location = "Main Bar Area")
             )
-
-            val attendant2Id = dao.insertUser(
-                User(
-                    name = "Sarah Wanjiku",
-                    role = UserRole.ATTENDANT,
-                    status = UserStatus.APPROVED,
-                    email = "sarah@savannahbar.co.ke",
-                    phone = "+254 733 000333",
-                    password = "pass"
-                )
-            )
-
-            dao.insertUser(
-                User(
-                    name = "Marcus Otieno",
-                    role = UserRole.ATTENDANT,
-                    status = UserStatus.PENDING,
-                    email = "marcus@savannahbar.co.ke",
-                    phone = "+254 744 000444",
-                    password = "pass"
-                )
-            )
-
-            // Seed Catalog Items - Typical Kenyan Bar Stock
-            val itemTusker = dao.insertItem(
-                Item(
-                    name = "Tusker Lager 500ml",
-                    category = ItemCategory.BEER,
-                    unitPrice = 300.00,
-                    casePrice = 7000.00,
-                    unitType = "Bottle",
-                    description = "Kenya's Finest Lager"
-                )
-            )
-
-            val itemTuskerMalt = dao.insertItem(
-                Item(
-                    name = "Tusker Malt 330ml",
-                    category = ItemCategory.BEER,
-                    unitPrice = 350.00,
-                    casePrice = 8000.00,
-                    unitType = "Bottle",
-                    description = "Premium Malt Lager"
-                )
-            )
-
-            val itemWhiteCap = dao.insertItem(
-                Item(
-                    name = "White Cap Crisp 500ml",
-                    category = ItemCategory.BEER,
-                    unitPrice = 320.00,
-                    casePrice = 7500.00,
-                    unitType = "Bottle",
-                    description = "Distinctive refreshing beer"
-                )
-            )
-
-            val itemGuinness = dao.insertItem(
-                Item(
-                    name = "Guinness FES 500ml",
-                    category = ItemCategory.BEER,
-                    unitPrice = 350.00,
-                    casePrice = 8200.00,
-                    unitType = "Bottle",
-                    description = "Rich African Stout"
-                )
-            )
-
-            val itemGilbeys = dao.insertItem(
-                Item(
-                    name = "Gilbey's Gin 750ml",
-                    category = ItemCategory.SPIRIT,
-                    unitPrice = 1800.00,
-                    casePrice = 20000.00,
-                    unitType = "Bottle",
-                    description = "London Dry Gin"
-                )
-            )
-
-            val itemGilbeysTot = dao.insertItem(
-                Item(
-                    name = "Gilbey's Gin Tot",
-                    category = ItemCategory.TOT,
-                    unitPrice = 150.00,
-                    casePrice = 3000.00,
-                    unitType = "Shot / Tot",
-                    description = "30ml measure shot"
-                )
-            )
-
-            val itemChrome = dao.insertItem(
-                Item(
-                    name = "Chrome Vodka 750ml",
-                    category = ItemCategory.SPIRIT,
-                    unitPrice = 1200.00,
-                    casePrice = 13500.00,
-                    unitType = "Bottle",
-                    description = "Smooth Kenyan Vodka"
-                )
-            )
-
-            val itemChromeTot = dao.insertItem(
-                Item(
-                    name = "Chrome Vodka Tot",
-                    category = ItemCategory.TOT,
-                    unitPrice = 100.00,
-                    casePrice = 2200.00,
-                    unitType = "Shot / Tot",
-                    description = "30ml measure shot"
-                )
-            )
-
-            val itemKenyaCane = dao.insertItem(
-                Item(
-                    name = "Kenya Cane 750ml",
-                    category = ItemCategory.SPIRIT,
-                    unitPrice = 1100.00,
-                    casePrice = 12000.00,
-                    unitType = "Bottle",
-                    description = "The Spirit of Kenya"
-                )
-            )
-
-            val itemCoke = dao.insertItem(
-                Item(
-                    name = "Coca-Cola 300ml",
-                    category = ItemCategory.SOFT_DRINK,
-                    unitPrice = 100.00,
-                    casePrice = 2000.00,
-                    unitType = "Bottle",
-                    description = "Refreshing Soda"
-                )
-            )
-
-            // Seed Counters
-            val c1Id = dao.insertCounter(
-                Counter(
-                    name = "Main Counter – Terrace",
-                    location = "Ground Floor Central"
-                )
-            )
-
-            val c2Id = dao.insertCounter(
-                Counter(
-                    name = "Garden Bar",
-                    location = "Outdoor Area"
-                )
-            )
-
-            val c3Id = dao.insertCounter(
-                Counter(
-                    name = "Executive Lounge",
-                    location = "1st Floor VIP"
-                )
-            )
-
-            // Seed Stock for Counter 1 (Main Bar)
-            val c1Stocks = listOf(
-                CounterStock(counterId = c1Id, itemId = itemTusker, currentQuantity = 120),
-                CounterStock(counterId = c1Id, itemId = itemTuskerMalt, currentQuantity = 60),
-                CounterStock(counterId = c1Id, itemId = itemWhiteCap, currentQuantity = 48),
-                CounterStock(counterId = c1Id, itemId = itemGuinness, currentQuantity = 48),
-                CounterStock(counterId = c1Id, itemId = itemGilbeys, currentQuantity = 12),
-                CounterStock(counterId = c1Id, itemId = itemGilbeysTot, currentQuantity = 100),
-                CounterStock(counterId = c1Id, itemId = itemChrome, currentQuantity = 15),
-                CounterStock(counterId = c1Id, itemId = itemChromeTot, currentQuantity = 120),
-                CounterStock(counterId = c1Id, itemId = itemKenyaCane, currentQuantity = 20),
-                CounterStock(counterId = c1Id, itemId = itemCoke, currentQuantity = 150)
-            )
-            dao.insertCounterStocks(c1Stocks)
-
-            // Seed Stock for Counter 2 (Garden Bar)
-            val c2Stocks = listOf(
-                CounterStock(counterId = c2Id, itemId = itemTusker, currentQuantity = 48),
-                CounterStock(counterId = c2Id, itemId = itemWhiteCap, currentQuantity = 36),
-                CounterStock(counterId = c2Id, itemId = itemGuinness, currentQuantity = 24),
-                CounterStock(counterId = c2Id, itemId = itemChromeTot, currentQuantity = 40),
-                CounterStock(counterId = c2Id, itemId = itemCoke, currentQuantity = 50)
-            )
-            dao.insertCounterStocks(c2Stocks)
-
-            // Seed Stock for Counter 3 (VIP Lounge)
-            val c3Stocks = listOf(
-                CounterStock(counterId = c3Id, itemId = itemTuskerMalt, currentQuantity = 36),
-                CounterStock(counterId = c3Id, itemId = itemGilbeys, currentQuantity = 12),
-                CounterStock(counterId = c3Id, itemId = itemGilbeysTot, currentQuantity = 90),
-                CounterStock(counterId = c3Id, itemId = itemTusker, currentQuantity = 24),
-                CounterStock(counterId = c3Id, itemId = itemGuinness, currentQuantity = 12)
-            )
-            dao.insertCounterStocks(c3Stocks)
-
-            // Seed Sample Historical Shift & Reconciliation for John
-            val prevShiftTime = System.currentTimeMillis() - 86400000L // Yesterday
-            val prevShiftId = dao.insertShift(
-                Shift(
-                    counterId = c1Id,
-                    counterName = "Main Counter – Terrace",
-                    attendantId = attendant1Id,
-                    attendantName = "John Kamau",
-                    startTime = prevShiftTime - 28800000L,
-                    endTime = prevShiftTime,
-                    status = ShiftStatus.CLOSED,
-                    totalExpectedSales = 24500.00,
-                    totalSubmittedCash = 24400.00,
-                    variance = -100.00,
-                    reconciliationType = ReconciliationType.LOSS,
-                    notes = "Evening shift closing. Small shortage of KSh 100.00."
-                )
-            )
-
-            // Seed Itemized Closings for prevShiftId with accurate item totals
-            dao.insertShiftClosings(
-                listOf(
-                    ShiftClosing(
-                        shiftId = prevShiftId,
-                        itemId = itemTusker,
-                        itemName = "Tusker Lager 500ml",
-                        category = ItemCategory.BEER,
-                        unitType = "Bottle",
-                        unitPrice = 300.00,
-                        openingQty = 48,
-                        adjustmentsQty = 0,
-                        effectiveOpeningQty = 48,
-                        closingQty = 20,
-                        unitsSold = 28,
-                        expectedAmount = 8400.00
-                    ),
-                    ShiftClosing(
-                        shiftId = prevShiftId,
-                        itemId = itemTuskerMalt,
-                        itemName = "Tusker Malt 330ml",
-                        category = ItemCategory.BEER,
-                        unitType = "Bottle",
-                        unitPrice = 350.00,
-                        openingQty = 36,
-                        adjustmentsQty = 0,
-                        effectiveOpeningQty = 36,
-                        closingQty = 12,
-                        unitsSold = 24,
-                        expectedAmount = 8400.00
-                    ),
-                    ShiftClosing(
-                        shiftId = prevShiftId,
-                        itemId = itemWhiteCap,
-                        itemName = "White Cap Crisp 500ml",
-                        category = ItemCategory.BEER,
-                        unitType = "Bottle",
-                        unitPrice = 320.00,
-                        openingQty = 30,
-                        adjustmentsQty = 0,
-                        effectiveOpeningQty = 30,
-                        closingQty = 15,
-                        unitsSold = 15,
-                        expectedAmount = 4800.00
-                    ),
-                    ShiftClosing(
-                        shiftId = prevShiftId,
-                        itemId = itemGuinness,
-                        itemName = "Guinness FES 500ml",
-                        category = ItemCategory.BEER,
-                        unitType = "Bottle",
-                        unitPrice = 350.00,
-                        openingQty = 24,
-                        adjustmentsQty = 0,
-                        effectiveOpeningQty = 24,
-                        closingQty = 16,
-                        unitsSold = 8,
-                        expectedAmount = 2800.00
+            dao.insertCounterStocks(
+                itemIds.map { itemId ->
+                    CounterStock(
+                        counterId = counterId,
+                        itemId = itemId,
+                        currentQuantity = 0,
+                        minThreshold = 0
                     )
-                )
-            )
-
-            dao.insertReconciliation(
-                Reconciliation(
-                    shiftId = prevShiftId,
-                    attendantId = attendant1Id,
-                    attendantName = "John Kamau",
-                    counterName = "Main Counter – Terrace",
-                    expectedTotal = 24500.00,
-                    submittedTotal = 24400.00,
-                    variance = -100.00,
-                    type = ReconciliationType.LOSS,
-                    date = prevShiftTime,
-                    monthYear = "2026-09",
-                    notes = "Shift #$prevShiftId Shortage"
-                )
-            )
-
-            // Seed Welcome Notifications
-            dao.insertNotification(
-                AppNotification(
-                    targetRole = UserRole.ADMIN,
-                    type = NotificationType.NEW_SIGNUP,
-                    title = "New Attendant Sign-up",
-                    message = "Marcus King has registered and is awaiting admin approval.",
-                    relatedId = 4L
-                )
-            )
-
-            dao.insertNotification(
-                AppNotification(
-                    targetUserId = attendant1Id,
-                    targetRole = UserRole.ATTENDANT,
-                    type = NotificationType.ACCOUNT_APPROVED,
-                    title = "Account Approved",
-                    message = "Welcome to Bar Stock Manager! Your attendant profile is active."
-                )
+                }
             )
         }
     }
