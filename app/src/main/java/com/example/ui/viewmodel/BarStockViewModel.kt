@@ -101,7 +101,6 @@ class BarStockViewModel(
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     init {
-        autoSync()
         viewModelScope.launch {
             billingManager.billingMessages.collect { msg ->
                 _toastMessage.emit(msg)
@@ -265,16 +264,24 @@ class BarStockViewModel(
             }
 
             try {
-                // 1. Try local/Firebase authentication first (instant and reliable)
+                // Authenticate first, then refresh this user's exact bar snapshot
+                // before navigating to either dashboard.
                 val localUser = repository.authenticateUser(identifier.trim(), password.trim())
                 if (localUser != null) {
-                    loginUser(localUser)
-                    // Sync cloud in background without blocking login
-                    autoSync()
+                    _isSyncing.value = true
+                    val syncResult = backupService.syncData(identifier.trim())
+                    val syncedUser = if (syncResult.isSuccess) {
+                        repository.authenticateUser(identifier.trim(), password.trim()) ?: localUser
+                    } else {
+                        localUser
+                    }
+                    _isSyncing.value = false
+                    loginUser(syncedUser)
                     return@launch
                 }
 
-                // 2. If not found locally, attempt to retrieve cloud tenant data for this user
+                // No local account yet: restore the cloud bar containing this email,
+                // then authenticate the restored user so its stored role is retained.
                 _isSyncing.value = true
                 try {
                     val syncResult = backupService.syncData(identifier.trim())
