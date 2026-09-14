@@ -207,6 +207,9 @@ interface BarStockDao {
     @Query("SELECT * FROM shift_closings WHERE shiftId = :shiftId ORDER BY category ASC, itemName ASC")
     fun getShiftClosingsForShift(shiftId: Long): Flow<List<ShiftClosing>>
 
+    @Query("SELECT * FROM shift_closings")
+    fun getAllShiftClosings(): Flow<List<ShiftClosing>>
+
     @Query("SELECT * FROM shift_closings WHERE shiftId = :shiftId")
     suspend fun getShiftClosingsForShiftSync(shiftId: Long): List<ShiftClosing>
 
