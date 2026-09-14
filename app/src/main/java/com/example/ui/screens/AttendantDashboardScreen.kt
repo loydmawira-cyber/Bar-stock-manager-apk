@@ -396,32 +396,6 @@ fun AttendantDashboardScreen(
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf(AttendantDashboardTab.OVERVIEW, AttendantDashboardTab.HISTORY).forEach { tab ->
-                    TextButton(
-                        onClick = { selectedTab = tab },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("attendant_${tab.name.lowercase()}_tab"),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = if (selectedTab == tab) AmberPrimary else Color.Transparent,
-                            contentColor = if (selectedTab == tab) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = RoundedCornerShape(9.dp)
-                    ) {
-                        Text(tab.name.lowercase().replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
         if (selectedTab == AttendantDashboardTab.OVERVIEW) {
         // Active Shift Card (if already in progress)
         if (activeShift != null) {
@@ -628,16 +602,12 @@ fun AttendantDashboardScreen(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         if (isMyShift) {
-                            Button(
-                                onClick = onResumeActiveShift,
-                                colors = ButtonDefaults.buttonColors(containerColor = SkyBlue),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("resume_counter_shift_${counter.id}")
-                            ) {
-                                Text("Resume Shift POS", color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
+                            Text(
+                                "Use the active shift button above to resume this counter.",
+                                fontSize = 12.sp,
+                                color = SkyBlue,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         } else if (isOccupied) {
                             OutlinedButton(
                                 onClick = { },
@@ -701,7 +671,7 @@ fun AttendantDashboardScreen(
                                 contentColor = if (selectedPeriod == HistoryPeriod.MONTH) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("Month", fontWeight = FontWeight.Bold) }
+                        ) { Text(monthLabels[selectedMonth], fontWeight = FontWeight.Bold) }
                         DropdownMenu(expanded = monthMenuExpanded, onDismissRequest = { monthMenuExpanded = false }) {
                             monthLabels.forEachIndexed { index, label ->
                                 DropdownMenuItem(text = { Text(label) }, onClick = { selectedMonth = index; selectedPeriod = HistoryPeriod.MONTH; monthMenuExpanded = false })
@@ -718,7 +688,7 @@ fun AttendantDashboardScreen(
                                 contentColor = if (selectedPeriod == HistoryPeriod.YEAR) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("Year", fontWeight = FontWeight.Bold) }
+                        ) { Text(selectedYear.toString(), fontWeight = FontWeight.Bold) }
                         DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
                             availableYears.forEach { year ->
                                 DropdownMenuItem(text = { Text(year.toString()) }, onClick = { selectedYear = year; selectedPeriod = HistoryPeriod.YEAR; yearMenuExpanded = false })
@@ -800,6 +770,32 @@ fun AttendantDashboardScreen(
                     }
                 }
             }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(AttendantDashboardTab.OVERVIEW, AttendantDashboardTab.HISTORY).forEach { tab ->
+                    TextButton(
+                        onClick = { selectedTab = tab },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("attendant_${tab.name.lowercase()}_tab"),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = if (selectedTab == tab) AmberPrimary else Color.Transparent,
+                            contentColor = if (selectedTab == tab) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(9.dp)
+                    ) {
+                        Text(tab.name.lowercase().replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
