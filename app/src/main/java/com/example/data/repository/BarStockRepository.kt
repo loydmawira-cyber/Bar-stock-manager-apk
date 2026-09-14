@@ -533,6 +533,7 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     // --- Shift Lifecycle & Handover ---
     val allShifts: Flow<List<Shift>> = dao.getAllShifts()
+    val allShiftClosings: Flow<List<ShiftClosing>> = dao.getAllShiftClosings()
     fun getShiftsByAttendant(attendantId: Long): Flow<List<Shift>> = dao.getShiftsByAttendant(attendantId)
     fun getActiveShiftForAttendantFlow(attendantId: Long): Flow<Shift?> = dao.getActiveShiftForAttendantFlow(attendantId)
     fun getShiftByIdFlow(shiftId: Long): Flow<Shift?> = dao.getShiftByIdFlow(shiftId)
