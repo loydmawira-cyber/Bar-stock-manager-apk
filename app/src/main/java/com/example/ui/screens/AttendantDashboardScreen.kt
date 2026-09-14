@@ -45,6 +45,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +90,12 @@ import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
 import com.example.ui.theme.SkyBlue
 import com.example.ui.viewmodel.AppScreen
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+
+private enum class AttendantDashboardTab { OVERVIEW, HISTORY }
+private enum class HistoryPeriod { TODAY, MONTH, YEAR }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -112,6 +120,36 @@ fun AttendantDashboardScreen(
 
     val myTotalLosses = myReconciliations.filter { it.variance < 0 }.sumOf { Math.abs(it.variance) }
     val myTotalExtras = myReconciliations.filter { it.variance > 0 }.sumOf { it.variance }
+
+    var selectedTab by remember { mutableStateOf(AttendantDashboardTab.OVERVIEW) }
+    var selectedPeriod by remember { mutableStateOf(HistoryPeriod.TODAY) }
+    var selectedMonth by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
+    var selectedYear by remember { mutableStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
+    var periodMenuExpanded by remember { mutableStateOf(false) }
+    var monthMenuExpanded by remember { mutableStateOf(false) }
+    var yearMenuExpanded by remember { mutableStateOf(false) }
+
+    val now = Calendar.getInstance()
+    val filteredShifts = myShifts.filter { shift ->
+        val date = Calendar.getInstance().apply { timeInMillis = shift.endTime ?: shift.startTime }
+        when (selectedPeriod) {
+            HistoryPeriod.TODAY -> date.get(Calendar.YEAR) == now.get(Calendar.YEAR) && date.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+            HistoryPeriod.MONTH -> date.get(Calendar.YEAR) == selectedYear && date.get(Calendar.MONTH) == selectedMonth
+            HistoryPeriod.YEAR -> date.get(Calendar.YEAR) == selectedYear
+        }
+    }
+    val filteredReconciliations = myReconciliations.filter { rec ->
+        val date = Calendar.getInstance().apply { timeInMillis = rec.date }
+        when (selectedPeriod) {
+            HistoryPeriod.TODAY -> date.get(Calendar.YEAR) == now.get(Calendar.YEAR) && date.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR)
+            HistoryPeriod.MONTH -> date.get(Calendar.YEAR) == selectedYear && date.get(Calendar.MONTH) == selectedMonth
+            HistoryPeriod.YEAR -> date.get(Calendar.YEAR) == selectedYear
+        }
+    }
+    val historySales = filteredShifts.sumOf { it.totalSubmittedCash }
+    val historyVariance = filteredReconciliations.sumOf { it.variance }
+    val monthLabels = (0..11).map { month -> SimpleDateFormat("MMMM", Locale.getDefault()).format(Calendar.getInstance().apply { set(Calendar.MONTH, month) }.time) }
+    val availableYears = ((now.get(Calendar.YEAR) - 4)..now.get(Calendar.YEAR)).toList().reversed()
 
     LazyColumn(
         modifier = Modifier
@@ -358,6 +396,33 @@ fun AttendantDashboardScreen(
             }
         }
 
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(AttendantDashboardTab.OVERVIEW, AttendantDashboardTab.HISTORY).forEach { tab ->
+                    TextButton(
+                        onClick = { selectedTab = tab },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("attendant_${tab.name.lowercase()}_tab"),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = if (selectedTab == tab) AmberPrimary else Color.Transparent,
+                            contentColor = if (selectedTab == tab) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(9.dp)
+                    ) {
+                        Text(tab.name.lowercase().replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        if (selectedTab == AttendantDashboardTab.OVERVIEW) {
         // Active Shift Card (if already in progress)
         if (activeShift != null) {
             item {
@@ -603,21 +668,60 @@ fun AttendantDashboardScreen(
             }
         }
 
-        // Recent Shift History
-        if (myShifts.isNotEmpty()) {
-            item {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "MY RECENT SHIFTS & RECONCILIATIONS",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp
-                )
-            }
+        }
 
-            items(myShifts.take(5)) { shift ->
-                val rec = myReconciliations.firstOrNull { it.shiftId == shift.id }
+        // History: recent shifts and reconciliation with period filters.
+        if (selectedTab == AttendantDashboardTab.HISTORY) {
+            item {
+                Text("SHIFT HISTORY & RECONCILIATION", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Box {
+                    OutlinedButton(
+                        onClick = { periodMenuExpanded = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Text("Period: ${selectedPeriod.name.lowercase().replaceFirstChar { it.uppercase() }}") }
+                    DropdownMenu(expanded = periodMenuExpanded, onDismissRequest = { periodMenuExpanded = false }) {
+                        HistoryPeriod.values().forEach { period ->
+                            DropdownMenuItem(
+                                text = { Text(period.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                onClick = { selectedPeriod = period; periodMenuExpanded = false }
+                            )
+                        }
+                    }
+                }
+                if (selectedPeriod == HistoryPeriod.MONTH) {
+                    Box {
+                        TextButton(onClick = { monthMenuExpanded = true }) { Text("Month: ${monthLabels[selectedMonth]}") }
+                        DropdownMenu(expanded = monthMenuExpanded, onDismissRequest = { monthMenuExpanded = false }) {
+                            monthLabels.forEachIndexed { index, label ->
+                                DropdownMenuItem(text = { Text(label) }, onClick = { selectedMonth = index; monthMenuExpanded = false })
+                            }
+                        }
+                    }
+                }
+                if (selectedPeriod == HistoryPeriod.YEAR) {
+                    Box {
+                        TextButton(onClick = { yearMenuExpanded = true }) { Text("Year: $selectedYear") }
+                        DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
+                            availableYears.forEach { year ->
+                                DropdownMenuItem(text = { Text(year.toString()) }, onClick = { selectedYear = year; yearMenuExpanded = false })
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MetricStatCard(title = "Sales subtotal", value = formatCurrency(historySales), icon = Icons.Filled.AttachMoney, iconColor = EmeraldGreen, subtitle = "Submitted cash", modifier = Modifier.weight(1f))
+                    MetricStatCard(title = "Variance subtotal", value = formatCurrency(historyVariance), icon = Icons.Filled.Warning, iconColor = if (historyVariance < 0) CrimsonRed else EmeraldGreen, subtitle = if (historyVariance < 0) "Shortage" else "Extra / balanced", modifier = Modifier.weight(1f))
+                }
+            }
+            if (filteredShifts.isEmpty()) {
+                item { Text("No shifts found for this period.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 20.dp)) }
+            } else {
+            items(filteredShifts) { shift ->
+                val rec = filteredReconciliations.firstOrNull { it.shiftId == shift.id }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp),
@@ -673,6 +777,7 @@ fun AttendantDashboardScreen(
                         }
                     }
                 }
+            }
             }
         }
 
