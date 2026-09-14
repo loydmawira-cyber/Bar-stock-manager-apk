@@ -675,40 +675,62 @@ fun AttendantDashboardScreen(
             item {
                 Text("SHIFT HISTORY & RECONCILIATION", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(8.dp))
-                Box {
-                    OutlinedButton(
-                        onClick = { periodMenuExpanded = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) { Text("Period: ${selectedPeriod.name.lowercase().replaceFirstChar { it.uppercase() }}") }
-                    DropdownMenu(expanded = periodMenuExpanded, onDismissRequest = { periodMenuExpanded = false }) {
-                        HistoryPeriod.values().forEach { period ->
-                            DropdownMenuItem(
-                                text = { Text(period.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                onClick = { selectedPeriod = period; periodMenuExpanded = false }
-                            )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(
+                        onClick = { selectedPeriod = HistoryPeriod.TODAY },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = if (selectedPeriod == HistoryPeriod.TODAY) AmberPrimary else Color.Transparent,
+                            contentColor = if (selectedPeriod == HistoryPeriod.TODAY) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Today", fontWeight = FontWeight.Bold) }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        TextButton(
+                            onClick = { selectedPeriod = HistoryPeriod.MONTH; monthMenuExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColors(
+                                containerColor = if (selectedPeriod == HistoryPeriod.MONTH) AmberPrimary else Color.Transparent,
+                                contentColor = if (selectedPeriod == HistoryPeriod.MONTH) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Month", fontWeight = FontWeight.Bold) }
+                        DropdownMenu(expanded = monthMenuExpanded, onDismissRequest = { monthMenuExpanded = false }) {
+                            monthLabels.forEachIndexed { index, label ->
+                                DropdownMenuItem(text = { Text(label) }, onClick = { selectedMonth = index; selectedPeriod = HistoryPeriod.MONTH; monthMenuExpanded = false })
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        TextButton(
+                            onClick = { selectedPeriod = HistoryPeriod.YEAR; yearMenuExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.textButtonColors(
+                                containerColor = if (selectedPeriod == HistoryPeriod.YEAR) AmberPrimary else Color.Transparent,
+                                contentColor = if (selectedPeriod == HistoryPeriod.YEAR) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Year", fontWeight = FontWeight.Bold) }
+                        DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
+                            availableYears.forEach { year ->
+                                DropdownMenuItem(text = { Text(year.toString()) }, onClick = { selectedYear = year; selectedPeriod = HistoryPeriod.YEAR; yearMenuExpanded = false })
+                            }
                         }
                     }
                 }
                 if (selectedPeriod == HistoryPeriod.MONTH) {
-                    Box {
-                        TextButton(onClick = { monthMenuExpanded = true }) { Text("Month: ${monthLabels[selectedMonth]}") }
-                        DropdownMenu(expanded = monthMenuExpanded, onDismissRequest = { monthMenuExpanded = false }) {
-                            monthLabels.forEachIndexed { index, label ->
-                                DropdownMenuItem(text = { Text(label) }, onClick = { selectedMonth = index; monthMenuExpanded = false })
-                            }
-                        }
-                    }
+                    Text("Selected month: ${monthLabels[selectedMonth]}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (selectedPeriod == HistoryPeriod.YEAR) {
-                    Box {
-                        TextButton(onClick = { yearMenuExpanded = true }) { Text("Year: $selectedYear") }
-                        DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
-                            availableYears.forEach { year ->
-                                DropdownMenuItem(text = { Text(year.toString()) }, onClick = { selectedYear = year; yearMenuExpanded = false })
-                            }
-                        }
-                    }
+                    Text("Selected year: $selectedYear", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             item {
