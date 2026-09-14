@@ -56,6 +56,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,9 +94,17 @@ import com.example.ui.viewmodel.AppScreen
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlinx.coroutines.delay
 
-private enum class AttendantDashboardTab { OVERVIEW, HISTORY }
+enum class AttendantDashboardTab { OVERVIEW, HISTORY }
 private enum class HistoryPeriod { TODAY, MONTH, YEAR }
+
+private fun formatShiftElapsedTime(startTime: Long, currentTime: Long): String {
+    val elapsedMinutes = maxOf(0L, (currentTime - startTime) / 60_000L)
+    val hours = elapsedMinutes / 60
+    val minutes = elapsedMinutes % 60
+    return "Shift time: ${hours}h ${minutes.toString().padStart(2, '0')}m"
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -112,7 +121,8 @@ fun AttendantDashboardScreen(
     onResumeActiveShift: () -> Unit,
     onViewShiftReceipt: (Shift) -> Unit = {},
     onChangePassword: (oldPass: String, newPass: String) -> Unit,
-    onNavigate: (AppScreen) -> Unit
+    onNavigate: (AppScreen) -> Unit,
+    selectedTab: AttendantDashboardTab = AttendantDashboardTab.OVERVIEW
 ) {
     val myShifts = shifts.filter { it.attendantId == currentUser.id }
     val myReconciliations = reconciliations.filter { it.attendantId == currentUser.id }
@@ -121,13 +131,20 @@ fun AttendantDashboardScreen(
     val myTotalLosses = myReconciliations.filter { it.variance < 0 }.sumOf { Math.abs(it.variance) }
     val myTotalExtras = myReconciliations.filter { it.variance > 0 }.sumOf { it.variance }
 
-    var selectedTab by remember { mutableStateOf(AttendantDashboardTab.OVERVIEW) }
     var selectedPeriod by remember { mutableStateOf(HistoryPeriod.TODAY) }
     var selectedMonth by remember { mutableStateOf(Calendar.getInstance().get(Calendar.MONTH)) }
     var selectedYear by remember { mutableStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
     var periodMenuExpanded by remember { mutableStateOf(false) }
     var monthMenuExpanded by remember { mutableStateOf(false) }
     var yearMenuExpanded by remember { mutableStateOf(false) }
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(activeShift?.id) {
+        while (activeShift != null) {
+            currentTime = System.currentTimeMillis()
+            delay(60_000L)
+        }
+    }
 
     val now = Calendar.getInstance()
     val filteredShifts = myShifts.filter { shift ->
@@ -603,7 +620,7 @@ fun AttendantDashboardScreen(
 
                         if (isMyShift) {
                             Text(
-                                "Use the active shift button above to resume this counter.",
+                                formatShiftElapsedTime(activeShift?.startTime ?: currentTime, currentTime),
                                 fontSize = 12.sp,
                                 color = SkyBlue,
                                 modifier = Modifier.fillMaxWidth()
@@ -770,32 +787,6 @@ fun AttendantDashboardScreen(
                     }
                 }
             }
-            }
-        }
-
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf(AttendantDashboardTab.OVERVIEW, AttendantDashboardTab.HISTORY).forEach { tab ->
-                    TextButton(
-                        onClick = { selectedTab = tab },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("attendant_${tab.name.lowercase()}_tab"),
-                        colors = ButtonDefaults.textButtonColors(
-                            containerColor = if (selectedTab == tab) AmberPrimary else Color.Transparent,
-                            contentColor = if (selectedTab == tab) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = RoundedCornerShape(9.dp)
-                    ) {
-                        Text(tab.name.lowercase().replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
         }
 
