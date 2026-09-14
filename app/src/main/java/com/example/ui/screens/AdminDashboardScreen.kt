@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,6 +84,7 @@ import com.example.data.model.Dispute
 import com.example.data.model.Item
 import com.example.data.model.Reconciliation
 import com.example.data.model.Shift
+import com.example.data.model.ShiftClosing
 import com.example.data.model.User
 import com.example.ui.components.BarLogoIcon
 import com.example.ui.components.DisputeBadge
@@ -100,6 +102,7 @@ import com.example.ui.theme.EmeraldGreen
 import com.example.ui.theme.OrangeAccent
 import com.example.ui.theme.SkyBlue
 import com.example.ui.viewmodel.AppScreen
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -108,6 +111,7 @@ fun AdminDashboardScreen(
     counters: List<Counter>,
     items: List<Item>,
     shifts: List<Shift>,
+    shiftClosings: List<ShiftClosing> = emptyList(),
     disputes: List<Dispute>,
     pendingUsers: List<User>,
     reconciliations: List<Reconciliation>,
@@ -130,6 +134,15 @@ fun AdminDashboardScreen(
 
     val netLosses = reconciliations.filter { it.variance < 0 }.sumOf { Math.abs(it.variance) }
     val netExtras = reconciliations.filter { it.variance > 0 }.sumOf { it.variance }
+    val sevenDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -6) }.timeInMillis
+    val shiftDates = shifts.associate { it.id to (it.endTime ?: it.startTime) }
+    val topSellingItems = shiftClosings
+        .filter { (shiftDates[it.shiftId] ?: 0L) >= sevenDaysAgo }
+        .groupBy { it.itemName }
+        .mapValues { (_, closings) -> closings.sumOf { it.unitsSold } }
+        .toList()
+        .sortedByDescending { it.second }
+        .take(3)
 
     LazyColumn(
         modifier = Modifier
@@ -369,6 +382,56 @@ fun AdminDashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Settings", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("admin_top_selling_items_ticker")
+            ) {
+                Column(modifier = Modifier.padding(vertical = 10.dp)) {
+                    Text(
+                        text = "TOP SELLING ITEMS · LAST 7 DAYS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = AmberPrimary,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (topSellingItems.isEmpty()) {
+                        Text(
+                            text = "No completed sales recorded in the last 7 days",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    } else {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(topSellingItems) { (itemName, quantity) ->
+                                Surface(
+                                    color = AmberPrimary.copy(alpha = 0.14f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.35f))
+                                ) {
+                                    Text(
+                                        text = "$itemName · $quantity units",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                    )
+                                }
                             }
                         }
                     }
