@@ -466,7 +466,7 @@ class BillingManager(
                 emitMessage("Failed to start Google Play purchase: ${result.debugMessage}")
             }
         } else {
-            activateSandboxPlan(plan)
+            emitMessage("Google Play Billing is unavailable. Please try again later.")
         }
     }
 
