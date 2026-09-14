@@ -64,6 +64,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -103,6 +104,14 @@ import com.example.ui.theme.OrangeAccent
 import com.example.ui.theme.SkyBlue
 import com.example.ui.viewmodel.AppScreen
 import java.util.Calendar
+import kotlinx.coroutines.delay
+
+private fun formatAdminShiftElapsedTime(startTime: Long, currentTime: Long): String {
+    val elapsedMinutes = maxOf(0L, (currentTime - startTime) / 60_000L)
+    val hours = elapsedMinutes / 60
+    val minutes = elapsedMinutes % 60
+    return "Shift time: ${hours}h ${minutes.toString().padStart(2, '0')}m"
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -143,6 +152,14 @@ fun AdminDashboardScreen(
         .toList()
         .sortedByDescending { it.second }
         .take(3)
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = System.currentTimeMillis()
+            delay(60_000L)
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -454,6 +471,9 @@ fun AdminDashboardScreen(
 
         items(counters) { counter ->
             val isActive = counter.activeAttendantId != null
+            val activeShiftForCounter = shifts.firstOrNull {
+                it.counterId == counter.id && it.status == com.example.data.model.ShiftStatus.ACTIVE
+            }
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = if (isActive) DarkSurface else DarkSurface.copy(alpha = 0.7f)
@@ -485,6 +505,14 @@ fun AdminDashboardScreen(
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (isActive && activeShiftForCounter != null) {
+                                Text(
+                                    text = formatAdminShiftElapsedTime(activeShiftForCounter.startTime, currentTime),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SkyBlue
+                                )
+                            }
                         }
 
                         if (isActive) {
