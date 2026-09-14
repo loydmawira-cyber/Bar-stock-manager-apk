@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -390,52 +390,32 @@ fun AdminDashboardScreen(
         }
 
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(12.dp),
+            val tickerText = if (topSellingItems.isEmpty()) {
+                "TOP SELLING ITEMS · LAST 7 DAYS    No completed sales recorded in the last 7 days"
+            } else {
+                "TOP SELLING ITEMS · LAST 7 DAYS    " +
+                    topSellingItems.joinToString("     •     ") { (itemName, quantity) ->
+                        "$itemName: $quantity units"
+                    }
+            }
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(DarkSurface)
+                    .clip(RoundedCornerShape(8.dp))
                     .testTag("admin_top_selling_items_ticker")
             ) {
-                Column(modifier = Modifier.padding(vertical = 10.dp)) {
-                    Text(
-                        text = "TOP SELLING ITEMS · LAST 7 DAYS",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = AmberPrimary,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    if (topSellingItems.isEmpty()) {
-                        Text(
-                            text = "No completed sales recorded in the last 7 days",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 12.dp)
-                        )
-                    } else {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(topSellingItems) { (itemName, quantity) ->
-                                Surface(
-                                    color = AmberPrimary.copy(alpha = 0.14f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.35f))
-                                ) {
-                                    Text(
-                                        text = "$itemName · $quantity units",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                Text(
+                    text = tickerText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AmberPrimary,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .basicMarquee()
+                )
             }
         }
 
