@@ -337,7 +337,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                                 viewModel.navigateTo(AppScreen.ACTIVE_SHIFT)
                             },
                             onChangePassword = { oldPass, newPass ->
-                                viewModel.changePassword(oldPass, newPass)
+                                viewModel.changePassword(user.id, oldPass, newPass)
                             },
                             selectedTab = attendantDashboardTab,
                             onViewShiftReceipt = { shift ->
