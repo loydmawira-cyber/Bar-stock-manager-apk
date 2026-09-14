@@ -116,6 +116,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val allItems by viewModel.allItems.collectAsState()
     val allCounters by viewModel.allCounters.collectAsState()
     val allShifts by viewModel.allShifts.collectAsState()
+    val allShiftClosings by viewModel.allShiftClosings.collectAsState()
     val allDisputes by viewModel.allDisputes.collectAsState()
     val allReconciliations by viewModel.allReconciliations.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -273,7 +274,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     )
                 }
 
-                AppScreen.ADMIN_DASHBOARD -> {
+                        AppScreen.ADMIN_DASHBOARD -> {
                     AdminDashboardScreen(
                         barProfile = barProfile,
                         counters = allCounters,
@@ -325,6 +326,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             activeShift = activeShift,
                             counters = allCounters,
                             shifts = allShifts,
+                            shiftClosings = allShiftClosings,
                             disputes = allDisputes,
                             reconciliations = allReconciliations,
                             unreadNotificationsCount = notifications.filter { !it.isRead }.size,
