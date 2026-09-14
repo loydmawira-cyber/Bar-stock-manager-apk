@@ -140,10 +140,10 @@ fun GoogleBillingAdminSection(
                         else -> Color.Gray
                     }
                     val statusText = when (connectionState) {
-                        BillingConnectionState.CONNECTED -> "Play Store Ready"
+                        BillingConnectionState.CONNECTED -> "Billing Connected"
                         BillingConnectionState.CONNECTING -> "Connecting..."
-                        BillingConnectionState.DISCONNECTED -> "Play Disconnected"
-                        BillingConnectionState.PLAY_STORE_UNAVAILABLE -> "Sandbox Mode"
+                        BillingConnectionState.DISCONNECTED -> "Billing Disconnected"
+                        BillingConnectionState.PLAY_STORE_UNAVAILABLE -> "Billing Unavailable"
                     }
 
                     Surface(
