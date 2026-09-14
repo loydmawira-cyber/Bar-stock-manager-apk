@@ -135,6 +135,7 @@ class BarStockViewModel(
 
     // Shifts & Disputes & Ledgers
     val allShifts = repository.allShifts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allShiftClosings = repository.allShiftClosings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allDisputes = repository.allDisputes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val openDisputes = repository.openDisputes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allReconciliations = repository.allReconciliations.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
