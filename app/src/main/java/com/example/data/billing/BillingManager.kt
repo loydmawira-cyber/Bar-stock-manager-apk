@@ -255,9 +255,9 @@ class BillingManager(
             .setProductList(subProductList)
             .build()
 
-        client.queryProductDetailsAsync(subParams) { billingResult, queryProductDetailsList ->
+        client.queryProductDetailsAsync(subParams) { billingResult, queryProductDetailsResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                queryProductDetailsList.forEach { details ->
+                queryProductDetailsResult.productDetailsList.forEach { details ->
                     productDetailsMap[details.productId] = details
                 }
                 updatePlansWithPlayDetails()
@@ -276,9 +276,9 @@ class BillingManager(
             .setProductList(inAppProductList)
             .build()
 
-        client.queryProductDetailsAsync(inAppParams) { billingResult, queryProductDetailsList ->
+        client.queryProductDetailsAsync(inAppParams) { billingResult, queryProductDetailsResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                queryProductDetailsList.forEach { details ->
+                queryProductDetailsResult.productDetailsList.forEach { details ->
                     productDetailsMap[details.productId] = details
                 }
                 updatePlansWithPlayDetails()
