@@ -129,13 +129,19 @@ fun AdminDashboardScreen(
     onNavigate: (AppScreen) -> Unit,
     onViewShiftReceipt: (Shift) -> Unit = {},
     onAddStockAdjustment: (counterId: Long, itemId: Long, qty: Int, reason: String) -> Unit,
+    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _ -> },
     onSelectCounterForManagement: (Long) -> Unit
 ) {
     var showRestockDialog by remember { mutableStateOf(false) }
+    var restockSource by remember { mutableStateOf("STORE") }
+    var expandedRestockSource by remember { mutableStateOf(false) }
     var selectedCounterForRestock by remember { mutableStateOf<Counter?>(null) }
     var selectedItemForRestock by remember { mutableStateOf<Item?>(null) }
     var restockQtyText by remember { mutableStateOf("12") }
     var restockReason by remember { mutableStateOf("Mid-Shift Restock") }
+    var restockSupplier by remember { mutableStateOf("") }
+    var restockReceiptNumber by remember { mutableStateOf("") }
+    var restockUnitCost by remember { mutableStateOf("0") }
 
     val activeShiftsCount = counters.count { it.activeAttendantId != null }
     val openDisputesCount = disputes.count { it.status == com.example.data.model.DisputeStatus.OPEN }
@@ -710,6 +716,27 @@ fun AdminDashboardScreen(
                         }
                     }
 
+                    ExposedDropdownMenuBox(
+                        expanded = expandedRestockSource,
+                        onExpandedChange = { expandedRestockSource = it }
+                    ) {
+                        OutlinedTextField(
+                            value = if (restockSource == "STORE") "From Store" else "Direct from Supplier",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Restock Source") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRestockSource) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedRestockSource,
+                            onDismissRequest = { expandedRestockSource = false }
+                        ) {
+                            DropdownMenuItem(text = { Text("From Store") }, onClick = { restockSource = "STORE"; expandedRestockSource = false })
+                            DropdownMenuItem(text = { Text("Direct from Supplier") }, onClick = { restockSource = "SUPPLIER"; expandedRestockSource = false })
+                        }
+                    }
+
                     // Select Item
                     ExposedDropdownMenuBox(
                         expanded = expandedItem,
@@ -756,6 +783,12 @@ fun AdminDashboardScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
                     )
 
+                    if (restockSource == "SUPPLIER") {
+                        OutlinedTextField(restockSupplier, { restockSupplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(restockReceiptNumber, { restockReceiptNumber = it }, label = { Text("Receipt / Invoice Number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(restockUnitCost, { restockUnitCost = it }, label = { Text("Cost per unit") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    }
+
                     OutlinedTextField(
                         value = restockReason,
                         onValueChange = { restockReason = it },
@@ -772,7 +805,16 @@ fun AdminDashboardScreen(
                         val counter = selectedCounterForRestock
                         val item = selectedItemForRestock
                         if (counter != null && item != null && qty != 0) {
-                            onAddStockAdjustment(counter.id, item.id, qty, restockReason)
+                            onRestockCounterFromSource(
+                                counter.id,
+                                item.id,
+                                qty,
+                                restockSource,
+                                restockSupplier,
+                                restockReceiptNumber,
+                                restockUnitCost.toDoubleOrNull() ?: 0.0,
+                                restockReason
+                            )
                             showRestockDialog = false
                         }
                     },
