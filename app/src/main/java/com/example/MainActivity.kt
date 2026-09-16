@@ -296,6 +296,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onAddStockAdjustment = { counterId, itemId, qty, reason ->
                             viewModel.addStockAdjustment(counterId, itemId, qty, reason)
                         },
+                        onRestockCounterFromSource = { counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason ->
+                            viewModel.restockCounterFromSource(counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason)
+                        },
                         onSelectCounterForManagement = { counterId ->
                             viewModel.setSelectedCounterForManagement(counterId)
                         }
