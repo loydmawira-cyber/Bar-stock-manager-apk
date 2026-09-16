@@ -17,5 +17,6 @@ data class BackupData(
     val disputes: List<Dispute> = emptyList(),
     val stockAdjustments: List<StockAdjustment> = emptyList(),
     val reconciliations: List<Reconciliation> = emptyList(),
-    val notifications: List<AppNotification> = emptyList()
+    val notifications: List<AppNotification> = emptyList(),
+    val expenses: List<Expense> = emptyList()
 )

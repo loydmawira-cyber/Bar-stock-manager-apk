@@ -15,6 +15,7 @@ import com.example.data.model.Counter
 import com.example.data.model.CounterStockWithItem
 import com.example.data.model.Dispute
 import com.example.data.model.DisputeStatus
+import com.example.data.model.Expense
 import com.example.data.model.Item
 import com.example.data.model.ItemCategory
 import com.example.data.model.Reconciliation
@@ -56,7 +57,9 @@ enum class AppScreen {
     USERS_MANAGEMENT,
     BAR_PROFILE,
     NOTIFICATIONS,
-    STORE_INVENTORY
+    STORE_INVENTORY,
+    EXPENSES_MANAGEMENT,
+    PROFIT_LOSS_REPORT
 }
 
 data class OpeningVerificationState(
@@ -153,14 +156,112 @@ class BarStockViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Active shift for currently logged in attendant
+    // Active shift for currently logged in user
     val activeShift: StateFlow<Shift?> = _currentUser.flatMapLatest { user ->
-        if (user != null && user.role == UserRole.ATTENDANT) {
+        if (user != null) {
             repository.getActiveShiftForAttendantFlow(user.id)
         } else {
             flowOf(null)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // Expenses
+    val allExpenses = repository.allExpenses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Managers & Owners
+    val owners = repository.owners.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val managers = repository.managers.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // P&L Report
+    private val _selectedPnlTimeframe = MutableStateFlow(com.example.data.model.PnlTimeframe.THIS_MONTH)
+    val selectedPnlTimeframe: StateFlow<com.example.data.model.PnlTimeframe> = _selectedPnlTimeframe.asStateFlow()
+
+    private val _pnlReport = MutableStateFlow<com.example.data.model.ProfitAndLossReport?>(null)
+    val pnlReport: StateFlow<com.example.data.model.ProfitAndLossReport?> = _pnlReport.asStateFlow()
+
+    fun loadProfitAndLossReport(timeframe: com.example.data.model.PnlTimeframe = _selectedPnlTimeframe.value) {
+        _selectedPnlTimeframe.value = timeframe
+        viewModelScope.launch {
+            _pnlReport.value = repository.generateProfitAndLossReport(timeframe)
+        }
+    }
+
+    fun addExpense(
+        category: String,
+        description: String,
+        amountText: String,
+        paymentMethod: String,
+        referenceNumber: String,
+        notes: String?
+    ) {
+        viewModelScope.launch {
+            if (category.isBlank() || description.isBlank() || amountText.isBlank()) {
+                _toastMessage.emit("Category, description, and amount are required.")
+                return@launch
+            }
+            val amt = amountText.toDoubleOrNull()
+            if (amt == null || amt <= 0) {
+                _toastMessage.emit("Amount must be a positive number greater than zero.")
+                return@launch
+            }
+            if (paymentMethod.isBlank() || referenceNumber.isBlank()) {
+                _toastMessage.emit("Payment method and reference number are required.")
+                return@launch
+            }
+            val user = _currentUser.value
+            val expense = com.example.data.model.Expense(
+                category = category.trim(),
+                description = description.trim(),
+                amount = amt,
+                paymentMethod = paymentMethod.trim(),
+                referenceNumber = referenceNumber.trim(),
+                recordedBy = user?.name ?: "Owner",
+                notes = notes?.trim()?.takeIf { it.isNotBlank() }
+            )
+            repository.addExpense(expense)
+            autoBackup()
+            _toastMessage.emit("Expense recorded successfully: ${expense.category}")
+            loadProfitAndLossReport(_selectedPnlTimeframe.value)
+        }
+    }
+
+    fun deleteExpense(id: Long) {
+        viewModelScope.launch {
+            repository.deleteExpense(id)
+            autoBackup()
+            _toastMessage.emit("Expense deleted.")
+            loadProfitAndLossReport(_selectedPnlTimeframe.value)
+        }
+    }
+
+    fun createManagerByOwner(name: String, email: String, phone: String, initialPassword: String) {
+        viewModelScope.launch {
+            if (name.isBlank() || email.isBlank() || phone.isBlank() || initialPassword.isBlank()) {
+                _toastMessage.emit("Manager name, email, phone, and password are required.")
+                return@launch
+            }
+            val validation = PasswordValidator.validate(initialPassword)
+            if (!validation.isValid) {
+                _toastMessage.emit("Password error: ${validation.missingRequirementsMessage}")
+                return@launch
+            }
+            try {
+                repository.createManagerByOwner(name.trim(), email.trim(), phone.trim(), initialPassword.trim())
+                backupService.backupData().getOrThrow()
+                _toastMessage.emit("Manager account created for $name.")
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Manager creation failed")
+            }
+        }
+    }
+
+    fun restoreUser(userId: Long) {
+        viewModelScope.launch {
+            repository.restoreUser(userId)
+            autoBackup()
+            _toastMessage.emit("User account restored.")
+        }
+    }
 
     // Current shift verification state (Shift Start)
     private val _selectedCounterForShift = MutableStateFlow<Counter?>(null)
@@ -268,7 +369,7 @@ class BarStockViewModel(
         }
 
         _currentUser.value = user
-        if (user.role == UserRole.ADMIN) {
+        if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) {
             _currentScreen.value = AppScreen.ADMIN_DASHBOARD
         } else {
             _currentScreen.value = AppScreen.ATTENDANT_DASHBOARD
@@ -461,7 +562,7 @@ class BarStockViewModel(
                     name = adminName.trim(),
                     email = email.trim(),
                     phone = phone.trim(),
-                    role = UserRole.ADMIN,
+                    role = UserRole.OWNER,
                     password = password.trim()
                 )
 

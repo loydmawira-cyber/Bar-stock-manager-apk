@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CategoryBadge
 import com.example.ui.components.LocalCurrencySymbol
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
 import com.example.ui.components.formatCurrency
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
@@ -302,6 +304,9 @@ fun ShiftEndClosingScreen(
         item {
             Spacer(modifier = Modifier.height(6.dp))
 
+            val cashVal = submittedCashInput.toDoubleOrNull()
+            val isCashValid = cashVal != null && cashVal >= 0.0
+
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(16.dp),
@@ -324,7 +329,11 @@ fun ShiftEndClosingScreen(
                     OutlinedTextField(
                         value = submittedCashInput,
                         onValueChange = onUpdateSubmittedCash,
-                        label = { Text("Cash Amount Handed Over ($currency)") },
+                        label = requiredLabel("Cash Amount Handed Over ($currency)"),
+                        isError = submittedCashInput.isNotEmpty() && !isCashValid,
+                        supportingText = if (submittedCashInput.isNotEmpty() && !isCashValid) {
+                            { Text("Enter a valid non-negative cash amount", color = CrimsonRed) }
+                        } else null,
                         leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null, tint = AmberPrimary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier
@@ -342,14 +351,14 @@ fun ShiftEndClosingScreen(
                     OutlinedTextField(
                         value = closingNotesInput,
                         onValueChange = onUpdateNotes,
-                        label = { Text("Shift Handover Notes (Optional)") },
+                        label = optionalLabel("Shift Handover Notes"),
                         leadingIcon = { Icon(Icons.Filled.EditNote, contentDescription = null) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
 
                     // Realtime Variance Preview
-                    if (submittedCashInput.isNotBlank()) {
+                    if (submittedCashInput.isNotBlank() && isCashValid) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val (varBg, varColor, varTitle) = when {
@@ -398,8 +407,10 @@ fun ShiftEndClosingScreen(
 
         // Final Submit Button
         item {
+            val isCashValid = (submittedCashInput.toDoubleOrNull() ?: -1.0) >= 0.0 && submittedCashInput.trim().isNotBlank()
             Button(
                 onClick = onSubmitClosing,
+                enabled = isCashValid,
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier

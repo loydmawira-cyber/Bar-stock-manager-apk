@@ -26,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Counter
+import com.example.ui.components.requiredLabel
+import com.example.ui.theme.CrimsonRed
 
 @Composable
 fun AdminInventoryScreen(
@@ -88,22 +90,43 @@ fun AdminInventoryScreen(
     }
 
     editingCounter?.let { counter ->
+        val isNameValid = editName.trim().isNotBlank()
+        val isLocValid = editLocation.trim().isNotBlank()
+        val isFormValid = isNameValid && isLocValid
+
         AlertDialog(
             onDismissRequest = { editingCounter = null },
             title = { Text("Edit Counter") },
             text = {
                 Column {
-                    OutlinedTextField(editName, { editName = it }, label = { Text("Counter name") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(editLocation, { editLocation = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = requiredLabel("Counter name"),
+                        isError = editName.isNotEmpty() && !isNameValid,
+                        supportingText = if (editName.isNotEmpty() && !isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editLocation,
+                        onValueChange = { editLocation = it },
+                        label = requiredLabel("Location"),
+                        isError = editLocation.isNotEmpty() && !isLocValid,
+                        supportingText = if (editLocation.isNotEmpty() && !isLocValid) { { Text("Location cannot be blank", color = CrimsonRed) } } else null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    if (editName.isNotBlank()) {
-                        onUpdateCounter(counter.id, editName.trim(), editLocation.trim())
-                        editingCounter = null
-                    }
-                }) { Text("Save") }
+                Button(
+                    onClick = {
+                        if (isFormValid) {
+                            onUpdateCounter(counter.id, editName.trim(), editLocation.trim())
+                            editingCounter = null
+                        }
+                    },
+                    enabled = isFormValid
+                ) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { editingCounter = null }) { Text("Cancel") } }
         )

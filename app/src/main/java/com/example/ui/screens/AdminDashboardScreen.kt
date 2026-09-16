@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AlertDialog
@@ -90,6 +93,8 @@ import com.example.data.model.StoreStockWithItem
 import com.example.data.model.User
 import com.example.ui.components.BarLogoIcon
 import com.example.ui.components.DisputeBadge
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
 import com.example.ui.components.MetricStatCard
 import com.example.ui.components.ReconciliationBadge
 import com.example.ui.components.ShiftStatusBadge
@@ -121,6 +126,7 @@ fun AdminDashboardScreen(
     counters: List<Counter>,
     items: List<Item>,
     shifts: List<Shift>,
+    currentUserRole: com.example.data.model.UserRole = com.example.data.model.UserRole.OWNER,
     storeStock: List<StoreStockWithItem> = emptyList(),
     shiftClosings: List<ShiftClosing> = emptyList(),
     disputes: List<Dispute>,
@@ -666,13 +672,111 @@ fun AdminDashboardScreen(
             }
         }
 
+        // Financial & Management Module Shortcuts
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "FINANCIAL & MANAGEMENT MODULES",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp
+            )
+        }
 
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (currentUserRole == com.example.data.model.UserRole.OWNER) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Card(
+                            onClick = { onNavigate(AppScreen.PROFIT_LOSS_REPORT) },
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).testTag("shortcut_pnl_report")
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Icon(Icons.Filled.AttachMoney, contentDescription = null, tint = EmeraldGreen)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Profit & Loss", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Weighted COGS & Margins", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Card(
+                            onClick = { onNavigate(AppScreen.EXPENSES_MANAGEMENT) },
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).testTag("shortcut_expenses")
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Icon(Icons.Filled.TrendingDown, contentDescription = null, tint = CrimsonRed)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Expenses", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Water, rent & wages", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Card(
+                        onClick = { onNavigate(AppScreen.STORE_INVENTORY) },
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).testTag("shortcut_store_inventory")
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Icon(Icons.Filled.Store, contentDescription = null, tint = AmberPrimary)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("Store Inventory", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Stock receipts & bulk items", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    Card(
+                        onClick = { onNavigate(AppScreen.USERS_MANAGEMENT) },
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).testTag("shortcut_user_management")
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Icon(Icons.Filled.People, contentDescription = null, tint = SkyBlue)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(if (currentUserRole == com.example.data.model.UserRole.OWNER) "User Hierarchy" else "Attendants", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Logins & approvals", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Mid-Shift Restock / Adjustment Modal
     if (showRestockDialog && selectedCounterForRestock != null) {
         var expandedCounter by remember { mutableStateOf(false) }
         var expandedItem by remember { mutableStateOf(false) }
+
+        val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForRestock?.id }?.currentQuantity ?: 0
+        val qtyVal = restockQtyText.toIntOrNull() ?: 0
+        val isQtyValid = qtyVal > 0
+        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && qtyVal <= availableAtStore)
+
+        val isCounterValid = selectedCounterForRestock != null
+        val isItemValid = selectedItemForRestock != null
+
+        val isSupplierValid = restockSupplier.trim().isNotBlank()
+        val isReceiptValid = restockReceiptNumber.trim().isNotBlank()
+        val costVal = restockUnitCost.toDoubleOrNull()
+        val isCostValid = costVal != null && costVal > 0.0
+
+        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid)
+        val isFormValid = isCounterValid && isItemValid && isQtyValid && isStoreQtyValid && isSupplierFormValid
 
         AlertDialog(
             onDismissRequest = { showRestockDialog = false },
@@ -696,7 +800,7 @@ fun AdminDashboardScreen(
                             value = selectedCounterForRestock?.name ?: "",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Counter") },
+                            label = requiredLabel("Counter"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCounter) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -726,7 +830,7 @@ fun AdminDashboardScreen(
                             value = if (restockSource == "STORE") "From Store" else "Direct from Supplier",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Restock Source") },
+                            label = requiredLabel("Restock Source"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRestockSource) },
                             modifier = Modifier.fillMaxWidth().menuAnchor()
                         )
@@ -748,7 +852,7 @@ fun AdminDashboardScreen(
                             value = selectedItemForRestock?.name ?: "",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Item to Restock") },
+                            label = requiredLabel("Item to Restock"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedItem) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -771,13 +875,27 @@ fun AdminDashboardScreen(
                     }
 
                     // Quantity input
+                    val hasNoStoreStock = restockSource == "STORE" && availableAtStore <= 0
+                    val isExceedingStoreStock = restockSource == "STORE" && availableAtStore > 0 && qtyVal > availableAtStore
+                    val hasQtyError = (restockQtyText.isNotEmpty() && !isQtyValid) || hasNoStoreStock || (restockQtyText.isNotEmpty() && isExceedingStoreStock)
+
                     OutlinedTextField(
                         value = restockQtyText,
                         onValueChange = { restockQtyText = it },
-                        label = { Text("Quantity Added (+/-)") },
+                        label = requiredLabel("Quantity Added (+ Units)"),
+                        isError = hasQtyError,
                         supportingText = {
-                            Text("Adds to existing counter stock (Existing + Added = New Total)")
+                            if (hasNoStoreStock) {
+                                Text("No stock available in Store for this item.", color = CrimsonRed)
+                            } else if (restockQtyText.isNotEmpty() && isExceedingStoreStock) {
+                                Text("Insufficient Store Stock. Available: $availableAtStore.", color = CrimsonRed)
+                            } else if (restockQtyText.isNotEmpty() && !isQtyValid) {
+                                Text("Quantity must be greater than 0", color = CrimsonRed)
+                            } else {
+                                Text("Adds to existing counter stock (Existing + Added = New Total)")
+                            }
                         },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("restock_qty_input"),
@@ -786,25 +904,42 @@ fun AdminDashboardScreen(
                     )
 
                     if (restockSource == "SUPPLIER") {
-                        OutlinedTextField(restockSupplier, { restockSupplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(restockReceiptNumber, { restockReceiptNumber = it }, label = { Text("Receipt / Invoice Number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         OutlinedTextField(
-                            restockUnitCost,
-                            { restockUnitCost = it },
-                            label = { Text("Cost per unit (required)") },
-                            supportingText = { if ((restockUnitCost.toDoubleOrNull() ?: 0.0) <= 0.0) Text("Enter a cost greater than 0 to create the purchase receipt.") },
+                            value = restockSupplier,
+                            onValueChange = { restockSupplier = it },
+                            label = requiredLabel("Supplier"),
+                            isError = restockSupplier.isNotEmpty() && !isSupplierValid,
+                            supportingText = if (restockSupplier.isNotEmpty() && !isSupplierValid) { { Text("Supplier name required", color = CrimsonRed) } } else null,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = restockReceiptNumber,
+                            onValueChange = { restockReceiptNumber = it },
+                            label = requiredLabel("Receipt / Invoice Number"),
+                            isError = restockReceiptNumber.isNotEmpty() && !isReceiptValid,
+                            supportingText = if (restockReceiptNumber.isNotEmpty() && !isReceiptValid) { { Text("Receipt number required", color = CrimsonRed) } } else null,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = restockUnitCost,
+                            onValueChange = { restockUnitCost = it },
+                            label = requiredLabel("Cost per unit"),
+                            isError = restockUnitCost.isNotEmpty() && !isCostValid,
+                            supportingText = if (restockUnitCost.isNotEmpty() && !isCostValid) { { Text("Cost must be > 0", color = CrimsonRed) } } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                     } else {
-                        val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForRestock?.id }?.currentQuantity ?: 0
                         Text("Available at Store: $availableAtStore ${selectedItemForRestock?.unitType ?: "units"}", color = EmeraldGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedTextField(
                         value = restockReason,
                         onValueChange = { restockReason = it },
-                        label = { Text("Reason / Note") },
+                        label = optionalLabel("Reason / Note"),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -813,25 +948,23 @@ fun AdminDashboardScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val qty = restockQtyText.toIntOrNull() ?: 0
                         val counter = selectedCounterForRestock
                         val item = selectedItemForRestock
-                        val cost = restockUnitCost.toDoubleOrNull() ?: 0.0
-                        if (counter != null && item != null && qty != 0 && (restockSource != "SUPPLIER" || cost > 0.0)) {
+                        if (isFormValid && counter != null && item != null) {
                             onRestockCounterFromSource(
                                 counter.id,
                                 item.id,
-                                qty,
+                                qtyVal,
                                 restockSource,
-                                restockSupplier,
-                                restockReceiptNumber,
-                                cost,
-                                restockReason
+                                restockSupplier.trim(),
+                                restockReceiptNumber.trim(),
+                                costVal ?: 0.0,
+                                restockReason.trim()
                             )
                             showRestockDialog = false
                         }
                     },
-                    enabled = restockSource != "SUPPLIER" || (restockUnitCost.toDoubleOrNull() ?: 0.0) > 0.0,
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
                 ) {
                     Text("Apply & Notify Attendant", color = Color.Black, fontWeight = FontWeight.Bold)

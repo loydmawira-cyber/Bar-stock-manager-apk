@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Item
 import com.example.data.model.StoreStockWithItem
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.EmeraldGreen
@@ -120,53 +123,122 @@ private fun ReceivePurchaseDialog(
     var cost by remember { mutableStateOf("0") }
     var notes by remember { mutableStateOf("") }
 
+    val isItemValid = selectedItem != null
+    val qtyVal = quantity.toIntOrNull()
+    val isQtyValid = qtyVal != null && qtyVal > 0
+
+    val packVal = unitsPerPack.toIntOrNull()
+    val isPackValid = packVal != null && packVal > 0
+
+    val isSupplierValid = supplier.trim().isNotBlank()
+    val isReceiptValid = receipt.trim().isNotBlank()
+
+    val costVal = cost.toDoubleOrNull()
+    val isCostValid = costVal != null && costVal > 0.0
+
+    val isFormValid = isItemValid && isQtyValid && isPackValid && isSupplierValid && isReceiptValid && isCostValid
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Receive Purchase into Store", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { itemMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text(selectedItem?.name ?: "Select item") }
-                DropdownMenu(expanded = itemMenuExpanded, onDismissRequest = { itemMenuExpanded = false }) {
-                    items.forEach { item -> DropdownMenuItem(text = { Text(item.name) }, onClick = { selectedItem = item; itemMenuExpanded = false }) }
-                }
-                OutlinedButton(
-                    onClick = { purchaseUnitMenuExpanded = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Purchase unit: $purchaseUnit") }
-                DropdownMenu(
-                    expanded = purchaseUnitMenuExpanded,
-                    onDismissRequest = { purchaseUnitMenuExpanded = false }
-                ) {
-                    listOf("Crate", "Case", "Bottle", "Other").forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = {
-                                purchaseUnit = option
-                                unitsPerPack = when (option) {
-                                    "Crate" -> "24"
-                                    "Case" -> "6"
-                                    "Bottle" -> "1"
-                                    else -> "1"
-                                }
-                                purchaseUnitMenuExpanded = false
-                            }
-                        )
+                Column {
+                    Text("Select Item *", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    OutlinedButton(onClick = { itemMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(selectedItem?.name ?: "Select item")
+                    }
+                    DropdownMenu(expanded = itemMenuExpanded, onDismissRequest = { itemMenuExpanded = false }) {
+                        items.forEach { item -> DropdownMenuItem(text = { Text(item.name) }, onClick = { selectedItem = item; itemMenuExpanded = false }) }
                     }
                 }
-                OutlinedTextField(quantity, { quantity = it }, label = { Text("Quantity purchased") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(unitsPerPack, { unitsPerPack = it }, label = { Text("Units per $purchaseUnit") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(supplier, { supplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(receipt, { receipt = it }, label = { Text("Receipt / invoice number") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(cost, { cost = it }, label = { Text("Cost per purchase unit") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(notes, { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
-                Text("Stock added: ${(quantity.toIntOrNull() ?: 0) * (unitsPerPack.toIntOrNull() ?: 0)} ${selectedItem?.unitType ?: "units"}", color = EmeraldGreen, fontSize = 12.sp)
+                Column {
+                    Text("Purchase Unit *", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    OutlinedButton(
+                        onClick = { purchaseUnitMenuExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Unit: $purchaseUnit") }
+                    DropdownMenu(
+                        expanded = purchaseUnitMenuExpanded,
+                        onDismissRequest = { purchaseUnitMenuExpanded = false }
+                    ) {
+                        listOf("Crate", "Case", "Bottle", "Other").forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    purchaseUnit = option
+                                    unitsPerPack = when (option) {
+                                        "Crate" -> "24"
+                                        "Case" -> "6"
+                                        "Bottle" -> "1"
+                                        else -> "1"
+                                    }
+                                    purchaseUnitMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = it },
+                    label = requiredLabel("Quantity purchased"),
+                    isError = quantity.isNotEmpty() && !isQtyValid,
+                    supportingText = if (quantity.isNotEmpty() && !isQtyValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = unitsPerPack,
+                    onValueChange = { unitsPerPack = it },
+                    label = requiredLabel("Units per $purchaseUnit"),
+                    isError = unitsPerPack.isNotEmpty() && !isPackValid,
+                    supportingText = if (unitsPerPack.isNotEmpty() && !isPackValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = supplier,
+                    onValueChange = { supplier = it },
+                    label = requiredLabel("Supplier"),
+                    isError = supplier.isNotEmpty() && !isSupplierValid,
+                    supportingText = if (supplier.isNotEmpty() && !isSupplierValid) { { Text("Supplier name required", color = CrimsonRed) } } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = receipt,
+                    onValueChange = { receipt = it },
+                    label = requiredLabel("Receipt / Invoice number"),
+                    isError = receipt.isNotEmpty() && !isReceiptValid,
+                    supportingText = if (receipt.isNotEmpty() && !isReceiptValid) { { Text("Receipt number required", color = CrimsonRed) } } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = cost,
+                    onValueChange = { cost = it },
+                    label = requiredLabel("Cost per purchase unit"),
+                    isError = cost.isNotEmpty() && !isCostValid,
+                    supportingText = if (cost.isNotEmpty() && !isCostValid) { { Text("Cost must be > 0", color = CrimsonRed) } } else null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = optionalLabel("Notes"),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Stock added: ${(qtyVal ?: 0) * (packVal ?: 0)} ${selectedItem?.unitType ?: "units"}", color = EmeraldGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         },
         confirmButton = {
-            Button(onClick = {
-                val item = selectedItem ?: return@Button
-                onConfirm(item.id, quantity.toIntOrNull() ?: 0, unitsPerPack.toIntOrNull() ?: 0, purchaseUnit, supplier, receipt, cost.toDoubleOrNull() ?: 0.0, notes)
-            }, colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)) { Text("Save Receipt", color = Color.Black, fontWeight = FontWeight.Bold) }
+            Button(
+                onClick = {
+                    val item = selectedItem ?: return@Button
+                    if (isFormValid) {
+                        onConfirm(item.id, qtyVal ?: 0, packVal ?: 0, purchaseUnit, supplier.trim(), receipt.trim(), costVal ?: 0.0, notes.trim())
+                    }
+                },
+                enabled = isFormValid,
+                colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
+            ) { Text("Save Receipt", color = Color.Black, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } }
     )

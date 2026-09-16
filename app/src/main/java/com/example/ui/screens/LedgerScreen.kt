@@ -181,15 +181,16 @@ fun LedgerScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    val isFiltered = timeframeMode != TimeframeMode.ALL_TIME || (currentUser.role == UserRole.ADMIN && selectedAttendantId != null)
+                    val isManagement = currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER
+                    val isFiltered = timeframeMode != TimeframeMode.ALL_TIME || (isManagement && selectedAttendantId != null)
 
-                    if (currentUser.role == UserRole.ADMIN || isFiltered) {
+                    if (isManagement || isFiltered) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (currentUser.role == UserRole.ADMIN) {
+                            if (isManagement) {
                                 Box {
                                     OutlinedButton(
                                         onClick = { showAttendantDropdown = true },
@@ -249,7 +250,7 @@ fun LedgerScreen(
                                 TextButton(
                                     onClick = {
                                         timeframeMode = TimeframeMode.ALL_TIME
-                                        if (currentUser.role == UserRole.ADMIN) {
+                                        if (currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER) {
                                             onSelectAttendantFilter(null)
                                         }
                                     }
@@ -605,7 +606,7 @@ fun LedgerScreen(
                         OutlinedButton(
                             onClick = {
                                 timeframeMode = TimeframeMode.ALL_TIME
-                                if (currentUser.role == UserRole.ADMIN) {
+                                if (currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER) {
                                     onSelectAttendantFilter(null)
                                 }
                             },

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.util.PasswordValidator
+import com.example.ui.components.requiredLabel
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
 
@@ -57,6 +58,12 @@ fun ChangePasswordDialog(
     var confirmPassVisible by remember { mutableStateOf(false) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val isOldValid = oldPassword.isNotBlank()
+    val newValidation = PasswordValidator.validate(newPassword)
+    val isNewValid = newValidation.isValid
+    val isConfirmValid = confirmPassword.isNotBlank() && confirmPassword == newPassword
+    val isFormValid = isOldValid && isNewValid && isConfirmValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -99,7 +106,9 @@ fun ChangePasswordDialog(
                         oldPassword = it
                         errorMessage = null
                     },
-                    label = { Text("Current Password") },
+                    label = requiredLabel("Current Password"),
+                    isError = oldPassword.isNotEmpty() && !isOldValid,
+                    supportingText = if (oldPassword.isNotEmpty() && !isOldValid) { { Text("Current password required", color = CrimsonRed) } } else null,
                     leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                     trailingIcon = {
                         IconButton(onClick = { oldPassVisible = !oldPassVisible }) {
@@ -126,7 +135,9 @@ fun ChangePasswordDialog(
                         newPassword = it
                         errorMessage = null
                     },
-                    label = { Text("New Password (min 4 chars)") },
+                    label = requiredLabel("New Password"),
+                    isError = newPassword.isNotEmpty() && !isNewValid,
+                    supportingText = if (newPassword.isNotEmpty() && !isNewValid) { { Text(newValidation.missingRequirementsMessage, color = CrimsonRed) } } else null,
                     leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
                     trailingIcon = {
                         IconButton(onClick = { newPassVisible = !newPassVisible }) {
@@ -153,7 +164,9 @@ fun ChangePasswordDialog(
                         confirmPassword = it
                         errorMessage = null
                     },
-                    label = { Text("Confirm New Password") },
+                    label = requiredLabel("Confirm New Password"),
+                    isError = confirmPassword.isNotEmpty() && !isConfirmValid,
+                    supportingText = if (confirmPassword.isNotEmpty() && !isConfirmValid) { { Text("Passwords do not match", color = CrimsonRed) } } else null,
                     leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null) },
                     trailingIcon = {
                         IconButton(onClick = { confirmPassVisible = !confirmPassVisible }) {
@@ -178,21 +191,11 @@ fun ChangePasswordDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (oldPassword.isBlank()) {
-                        errorMessage = "Please enter your current password."
-                        return@Button
+                    if (isFormValid) {
+                        onConfirmChange(oldPassword, newPassword)
                     }
-                    val validation = PasswordValidator.validate(newPassword)
-                    if (!validation.isValid) {
-                        errorMessage = validation.missingRequirementsMessage
-                        return@Button
-                    }
-                    if (newPassword != confirmPassword) {
-                        errorMessage = "New passwords do not match."
-                        return@Button
-                    }
-                    onConfirmChange(oldPassword, newPassword)
                 },
+                enabled = isFormValid,
                 colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
                 modifier = Modifier.testTag("dialog_submit_change_password")
             ) {

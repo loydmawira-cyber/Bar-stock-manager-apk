@@ -97,9 +97,13 @@ fun BarAppTopBar(
                     )
                     if (currentUser != null) {
                         Text(
-                            text = if (currentUser.role == UserRole.ADMIN) "${barProfile.barName} · Admin" else "${barProfile.barName} · ${currentUser.name}",
+                            text = "${barProfile.barName} · ${currentUser.role.name} (${currentUser.name})",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (currentUser.role == UserRole.ADMIN) AmberPrimary else EmeraldGreen,
+                            color = when (currentUser.role) {
+                                UserRole.OWNER -> AmberPrimary
+                                UserRole.MANAGER -> Color(0xFF60A5FA)
+                                UserRole.ATTENDANT -> EmeraldGreen
+                            },
                             fontSize = 11.sp,
                             maxLines = 1
                         )
@@ -182,9 +186,13 @@ fun BarAppTopBar(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Icon(
-                                imageVector = if (currentUser.role == UserRole.ADMIN) Icons.Outlined.Shield else Icons.Outlined.Person,
+                                imageVector = if (currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER) Icons.Outlined.Shield else Icons.Outlined.Person,
                                 contentDescription = null,
-                                tint = if (currentUser.role == UserRole.ADMIN) AmberPrimary else EmeraldGreen,
+                                tint = when (currentUser.role) {
+                                    UserRole.OWNER -> AmberPrimary
+                                    UserRole.MANAGER -> Color(0xFF60A5FA)
+                                    UserRole.ATTENDANT -> EmeraldGreen
+                                },
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -213,7 +221,7 @@ fun BarAppTopBar(
                         DropdownMenuItem(
                             text = { 
                                 Text(
-                                    text = if (currentUser.role == UserRole.ADMIN) "Bar Profile & Settings" else "Settings & Station",
+                                    text = if (currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER) "Bar Profile & Settings" else "Settings & Station",
                                     fontWeight = FontWeight.SemiBold 
                                 ) 
                             },

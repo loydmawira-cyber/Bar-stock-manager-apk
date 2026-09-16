@@ -1,25 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -28,32 +16,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,8 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.User
@@ -72,36 +36,56 @@ import com.example.data.util.PasswordValidator
 import com.example.ui.components.StrongPasswordField
 import com.example.ui.components.UserStatusBadge
 import com.example.ui.components.formatDateTime
+import com.example.ui.components.requiredLabel
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserManagementScreen(
+    currentUserRole: UserRole,
     allUsers: List<User>,
     onApproveUser: (Long) -> Unit,
     onRevokeUser: (Long) -> Unit,
+    onRestoreUser: (Long) -> Unit,
     onCreateAttendant: (name: String, email: String, phone: String, password: String) -> Unit,
+    onCreateManager: (name: String, email: String, phone: String, password: String) -> Unit,
     onDeleteUser: (Long) -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var selectedStatusTab by remember { mutableIntStateOf(0) } // 0: Active, 1: Pending, 2: Revoked
+    var selectedRoleFilter by remember { mutableStateOf(if (currentUserRole == UserRole.OWNER) "ALL" else "ATTENDANTS") }
 
-    // Form inputs for new attendant
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var targetRoleToCreate by remember { mutableStateOf(UserRole.ATTENDANT) }
+
+    // Form inputs
     var newName by remember { mutableStateOf("") }
     var newEmail by remember { mutableStateOf("") }
     var newPhone by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
 
-    val attendantsOnly = allUsers.filter { it.role == UserRole.ATTENDANT }
-    val pendingList = attendantsOnly.filter { it.status == UserStatus.PENDING }
-    val approvedList = attendantsOnly.filter { it.status == UserStatus.APPROVED }
-    val revokedList = attendantsOnly.filter { it.status == UserStatus.REVOKED }
+    // Filter users based on current user role
+    val visibleUsers = if (currentUserRole == UserRole.MANAGER) {
+        // Managers can ONLY view Attendants
+        allUsers.filter { it.role == UserRole.ATTENDANT }
+    } else {
+        // Owner can view according to role filter
+        when (selectedRoleFilter) {
+            "MANAGERS" -> allUsers.filter { it.role == UserRole.MANAGER }
+            "ATTENDANTS" -> allUsers.filter { it.role == UserRole.ATTENDANT }
+            "OWNERS" -> allUsers.filter { it.role == UserRole.OWNER }
+            else -> allUsers
+        }
+    }
 
-    val displayedUsers = when (selectedTab) {
+    val approvedList = visibleUsers.filter { it.status == UserStatus.APPROVED }
+    val pendingList = visibleUsers.filter { it.status == UserStatus.PENDING }
+    val revokedList = visibleUsers.filter { it.status == UserStatus.REVOKED }
+
+    val displayedUsers = when (selectedStatusTab) {
         0 -> approvedList
         1 -> pendingList
         else -> revokedList
@@ -113,60 +97,91 @@ fun UserManagementScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
-        // Header & Quick Add Button
+        // Header & Quick Add Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "ATTENDANT LOGINS & ACCESS",
+                    text = if (currentUserRole == UserRole.OWNER) "BUSINESS USER HIERARCHY" else "BAR ATTENDANT MANAGEMENT",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = AmberPrimary,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Manage bar staff logins and revocations",
+                    text = if (currentUserRole == UserRole.OWNER) "Manage Owners, Managers, and Attendants" else "Manage Attendant accounts and shift access",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Button(
-                onClick = {
-                    newName = ""
-                    newEmail = ""
-                    newPhone = ""
-                    newPassword = "BarPass@" + (1000..9999).random()
-                    showCreateDialog = true
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("create_attendant_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PersonAdd,
-                    contentDescription = null,
-                    tint = Color.Black,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("New Attendant", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (currentUserRole == UserRole.OWNER) {
+                    Button(
+                        onClick = {
+                            newName = ""
+                            newEmail = ""
+                            newPhone = ""
+                            newPassword = "MgrPass@" + (1000..9999).random()
+                            targetRoleToCreate = UserRole.MANAGER
+                            showCreateDialog = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.testTag("create_manager_button")
+                    ) {
+                        Text("+ Manager", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        newName = ""
+                        newEmail = ""
+                        newPhone = ""
+                        newPassword = "BarPass@" + (1000..9999).random()
+                        targetRoleToCreate = UserRole.ATTENDANT
+                        showCreateDialog = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("create_attendant_button")
+                ) {
+                    Text("+ Attendant", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // Role Filter Row for Owner
+        if (currentUserRole == UserRole.OWNER) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("ALL", "MANAGERS", "ATTENDANTS", "OWNERS").forEach { roleName ->
+                    FilterChip(
+                        selected = selectedRoleFilter == roleName,
+                        onClick = { selectedRoleFilter = roleName },
+                        label = { Text(roleName, fontSize = 11.sp) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         // Tabs: Approved / Pending / Revoked
         TabRow(
-            selectedTabIndex = selectedTab,
+            selectedTabIndex = selectedStatusTab,
             containerColor = DarkSurface,
             contentColor = AmberPrimary,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    Modifier.tabIndicatorOffset(tabPositions[selectedStatusTab]),
                     color = AmberPrimary
                 )
             },
@@ -175,20 +190,20 @@ fun UserManagementScreen(
                 .clip(RoundedCornerShape(12.dp))
         ) {
             Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
+                selected = selectedStatusTab == 0,
+                onClick = { selectedStatusTab = 0 },
                 text = { Text("Active (${approvedList.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                 modifier = Modifier.testTag("tab_users_approved")
             )
             Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
+                selected = selectedStatusTab == 1,
+                onClick = { selectedStatusTab = 1 },
                 text = { Text("Pending (${pendingList.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                 modifier = Modifier.testTag("tab_users_pending")
             )
             Tab(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
+                selected = selectedStatusTab == 2,
+                onClick = { selectedStatusTab = 2 },
                 text = { Text("Revoked (${revokedList.size})", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                 modifier = Modifier.testTag("tab_users_revoked")
             )
@@ -204,8 +219,8 @@ fun UserManagementScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = when (selectedTab) {
-                        0 -> "No active attendants. Click 'New Attendant' to create one."
+                    text = when (selectedStatusTab) {
+                        0 -> "No active accounts in this view."
                         1 -> "No pending applications."
                         else -> "No revoked accounts."
                     },
@@ -220,171 +235,29 @@ fun UserManagementScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(displayedUsers, key = { it.id }) { user ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when (user.status) {
-                                                    UserStatus.APPROVED -> EmeraldGreen.copy(alpha = 0.15f)
-                                                    UserStatus.REVOKED -> CrimsonRed.copy(alpha = 0.15f)
-                                                    UserStatus.PENDING -> AmberPrimary.copy(alpha = 0.15f)
-                                                }
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Person,
-                                            contentDescription = null,
-                                            tint = when (user.status) {
-                                                UserStatus.APPROVED -> EmeraldGreen
-                                                UserStatus.REVOKED -> CrimsonRed
-                                                UserStatus.PENDING -> AmberPrimary
-                                            }
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column {
-                                        Text(
-                                            text = user.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = "${user.phone} · ${user.email}",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                UserStatusBadge(status = user.status)
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Password security badge
-                            Surface(
-                                color = DarkSurfaceVariant,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Lock,
-                                        contentDescription = null,
-                                        tint = AmberPrimary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Attendant controls & resets their own password",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Action buttons based on status
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Added: ${formatDateTime(user.createdAt)}",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                Row {
-                                    if (user.status == UserStatus.PENDING) {
-                                        OutlinedButton(
-                                            onClick = { onRevokeUser(user.id) },
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Reject", color = CrimsonRed, fontSize = 12.sp)
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Button(
-                                            onClick = { onApproveUser(user.id) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.testTag("approve_user_button_${user.id}")
-                                        ) {
-                                            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Approve", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        }
-                                    } else if (user.status == UserStatus.APPROVED) {
-                                        IconButton(
-                                            onClick = { onDeleteUser(user.id) }
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-
-                                        Spacer(modifier = Modifier.width(4.dp))
-
-                                        OutlinedButton(
-                                            onClick = { onRevokeUser(user.id) },
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.testTag("revoke_user_button_${user.id}")
-                                        ) {
-                                            Icon(Icons.Filled.Block, contentDescription = null, tint = CrimsonRed, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Revoke Access", color = CrimsonRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    } else if (user.status == UserStatus.REVOKED) {
-                                        IconButton(
-                                            onClick = { onDeleteUser(user.id) }
-                                        ) {
-                                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-
-                                        Spacer(modifier = Modifier.width(4.dp))
-
-                                        Button(
-                                            onClick = { onApproveUser(user.id) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Re-Approve Access", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    UserCardItem(
+                        user = user,
+                        currentUserRole = currentUserRole,
+                        onApprove = { onApproveUser(user.id) },
+                        onRevoke = { onRevokeUser(user.id) },
+                        onRestore = { onRestoreUser(user.id) },
+                        onDelete = { onDeleteUser(user.id) }
+                    )
                 }
             }
         }
     }
 
-    // Modal Dialog: Admin Creating New Attendant Login
+    // Modal Dialog: Creating New Account
     if (showCreateDialog) {
+        var submittedAttempt by remember { mutableStateOf(false) }
+
+        val isNameValid = newName.trim().isNotBlank()
+        val isPhoneValid = newPhone.trim().isNotBlank()
+        val isEmailValid = newEmail.trim().isNotBlank() && newEmail.contains("@")
+        val passwordValid = PasswordValidator.validate(newPassword).isValid
+        val isFormValid = isNameValid && isPhoneValid && isEmailValid && passwordValid
+
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
             title = {
@@ -397,7 +270,7 @@ fun UserManagementScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Create Attendant Login",
+                        text = if (targetRoleToCreate == UserRole.MANAGER) "Create Manager Account" else "Create Attendant Account",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -406,7 +279,7 @@ fun UserManagementScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Provide the attendant's unique email and phone number. These identifiers cannot be reused by another bar.",
+                        text = "Fill in all compulsory fields (*). Every account requires a unique email, phone number, and strong password.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -414,48 +287,54 @@ fun UserManagementScreen(
                     OutlinedTextField(
                         value = newName,
                         onValueChange = { newName = it },
-                        label = { Text("Attendant Full Name *") },
+                        label = requiredLabel("Full Name"),
+                        isError = submittedAttempt && !isNameValid,
+                        supportingText = {
+                            if (submittedAttempt && !isNameValid) {
+                                Text("Full name is required", color = CrimsonRed)
+                            }
+                        },
                         leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("new_attendant_name"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberPrimary,
-                            focusedLabelColor = AmberPrimary
-                        )
+                            .testTag("new_user_name"),
+                        singleLine = true
                     )
 
                     OutlinedTextField(
                         value = newPhone,
                         onValueChange = { newPhone = it },
-                        label = { Text("Phone Number *") },
+                        label = requiredLabel("Phone Number"),
+                        isError = submittedAttempt && !isPhoneValid,
+                        supportingText = {
+                            if (submittedAttempt && !isPhoneValid) {
+                                Text("Phone number is required", color = CrimsonRed)
+                            }
+                        },
                         leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("new_attendant_phone"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberPrimary,
-                            focusedLabelColor = AmberPrimary
-                        )
+                            .testTag("new_user_phone"),
+                        singleLine = true
                     )
 
                     OutlinedTextField(
                         value = newEmail,
                         onValueChange = { newEmail = it },
-                        label = { Text("Unique Email *") },
+                        label = requiredLabel("Email Address"),
+                        isError = submittedAttempt && !isEmailValid,
+                        supportingText = {
+                            if (submittedAttempt && !isEmailValid) {
+                                Text("Valid email address is required", color = CrimsonRed)
+                            }
+                        },
                         leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("new_attendant_email"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberPrimary,
-                            focusedLabelColor = AmberPrimary
-                        )
+                            .testTag("new_user_email"),
+                        singleLine = true
                     )
 
                     StrongPasswordField(
@@ -464,24 +343,27 @@ fun UserManagementScreen(
                         label = "Initial Password *",
                         placeholder = "Min 8 chars, 1 uppercase, 1 digit, 1 special",
                         modifier = Modifier.fillMaxWidth(),
-                        testTag = "new_attendant_password"
+                        testTag = "new_user_password"
                     )
                 }
             },
             confirmButton = {
-                val passwordValid = PasswordValidator.validate(newPassword).isValid
                 Button(
                     onClick = {
-                        if (newName.isNotBlank() && newEmail.isNotBlank() && newPhone.isNotBlank() && passwordValid) {
-                            onCreateAttendant(newName, newEmail, newPhone, newPassword)
+                        submittedAttempt = true
+                        if (isFormValid) {
+                            if (targetRoleToCreate == UserRole.MANAGER) {
+                                onCreateManager(newName.trim(), newEmail.trim(), newPhone.trim(), newPassword)
+                            } else {
+                                onCreateAttendant(newName.trim(), newEmail.trim(), newPhone.trim(), newPassword)
+                            }
                             showCreateDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
-                    enabled = newName.isNotBlank() && newPhone.isNotBlank() && passwordValid,
-                    modifier = Modifier.testTag("submit_create_attendant_button")
+                    colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary, contentColor = Color.Black),
+                    modifier = Modifier.testTag("submit_create_user_button")
                 ) {
-                    Text("Create Account", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Create Account", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -490,5 +372,156 @@ fun UserManagementScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun UserCardItem(
+    user: User,
+    currentUserRole: UserRole,
+    onApprove: () -> Unit,
+    onRevoke: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val canManageThisUser = when {
+        currentUserRole == UserRole.OWNER -> user.role != UserRole.OWNER // Owner can manage Manager & Attendants
+        currentUserRole == UserRole.MANAGER -> user.role == UserRole.ATTENDANT // Manager can ONLY manage Attendants
+        else -> false
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (user.status) {
+                                    UserStatus.APPROVED -> EmeraldGreen.copy(alpha = 0.15f)
+                                    UserStatus.REVOKED -> CrimsonRed.copy(alpha = 0.15f)
+                                    UserStatus.PENDING -> AmberPrimary.copy(alpha = 0.15f)
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = when (user.status) {
+                                UserStatus.APPROVED -> EmeraldGreen
+                                UserStatus.REVOKED -> CrimsonRed
+                                UserStatus.PENDING -> AmberPrimary
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = user.name,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                color = when (user.role) {
+                                    UserRole.OWNER -> AmberPrimary.copy(alpha = 0.2f)
+                                    UserRole.MANAGER -> Color(0xFF3B82F6).copy(alpha = 0.2f)
+                                    UserRole.ATTENDANT -> Color(0xFF10B981).copy(alpha = 0.2f)
+                                },
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = user.role.name,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when (user.role) {
+                                        UserRole.OWNER -> AmberPrimary
+                                        UserRole.MANAGER -> Color(0xFF60A5FA)
+                                        UserRole.ATTENDANT -> Color(0xFF34D399)
+                                    },
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "${user.phone} · ${user.email}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                UserStatusBadge(status = user.status)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Footer & Actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Added: ${formatDateTime(user.createdAt)}",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (canManageThisUser) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = CrimsonRed)
+                        }
+
+                        when (user.status) {
+                            UserStatus.PENDING -> {
+                                Button(
+                                    onClick = onApprove,
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Approve", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                            UserStatus.APPROVED -> {
+                                OutlinedButton(
+                                    onClick = onRevoke,
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Revoke", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                            UserStatus.REVOKED -> {
+                                Button(
+                                    onClick = onRestore,
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Restore", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

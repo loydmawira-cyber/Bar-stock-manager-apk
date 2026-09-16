@@ -60,6 +60,8 @@ import com.example.data.model.DisputeStatus
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.ui.components.DisputeBadge
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
 import com.example.ui.components.formatDateTime
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
@@ -284,7 +286,7 @@ fun DisputeManagementScreen(
                             }
 
                             // Admin Resolve Button
-                            if (currentUser.role == UserRole.ADMIN && dispute.status == DisputeStatus.OPEN) {
+                            if ((currentUser.role == UserRole.OWNER || currentUser.role == UserRole.MANAGER) && dispute.status == DisputeStatus.OPEN) {
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Button(
                                     onClick = {
@@ -312,6 +314,10 @@ fun DisputeManagementScreen(
 
     // Resolve Dispute Dialog
     resolvingDispute?.let { dispute ->
+        val stockQtyVal = adjustedStockText.toIntOrNull()
+        val isStockQtyValid = stockQtyVal != null && stockQtyVal >= 0
+        val isFormValid = isStockQtyValid
+
         AlertDialog(
             onDismissRequest = { resolvingDispute = null },
             title = {
@@ -328,7 +334,7 @@ fun DisputeManagementScreen(
                     OutlinedTextField(
                         value = resolutionNotesText,
                         onValueChange = { resolutionNotesText = it },
-                        label = { Text("Resolution Notes / Investigation Outcome") },
+                        label = optionalLabel("Investigation Notes / Outcome"),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("resolution_notes_input"),
@@ -339,7 +345,11 @@ fun DisputeManagementScreen(
                     OutlinedTextField(
                         value = adjustedStockText,
                         onValueChange = { adjustedStockText = it },
-                        label = { Text("Set Official Counter Stock Quantity") },
+                        label = requiredLabel("Official Counter Stock Quantity"),
+                        isError = adjustedStockText.isNotEmpty() && !isStockQtyValid,
+                        supportingText = if (adjustedStockText.isNotEmpty() && !isStockQtyValid) {
+                            { Text("Quantity must be >= 0", color = CrimsonRed) }
+                        } else null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -350,10 +360,12 @@ fun DisputeManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val stockQty = adjustedStockText.toIntOrNull()
-                        onResolveDispute(dispute.id, resolutionNotesText, stockQty)
-                        resolvingDispute = null
+                        if (isFormValid) {
+                            onResolveDispute(dispute.id, resolutionNotesText.trim(), stockQtyVal)
+                            resolvingDispute = null
+                        }
                     },
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
                 ) {
                     Text("Confirm Resolution", color = Color.Black, fontWeight = FontWeight.Bold)

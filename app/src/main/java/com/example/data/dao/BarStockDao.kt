@@ -386,4 +386,20 @@ interface BarStockDao {
 
     @Query("DELETE FROM app_notifications")
     suspend fun clearNotifications()
+
+    // --- Expenses ---
+    @Query("SELECT * FROM expenses ORDER BY date DESC")
+    fun getAllExpenses(): Flow<List<com.example.data.model.Expense>>
+
+    @Query("SELECT * FROM expenses")
+    suspend fun getAllExpensesSync(): List<com.example.data.model.Expense>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExpense(expense: com.example.data.model.Expense): Long
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun deleteExpense(id: Long)
+
+    @Query("DELETE FROM expenses")
+    suspend fun clearExpenses()
 }

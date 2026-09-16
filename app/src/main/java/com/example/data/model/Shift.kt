@@ -23,6 +23,7 @@ data class Shift(
     val counterName: String,
     val attendantId: Long,
     val attendantName: String,
+    val attendantRole: UserRole = UserRole.ATTENDANT,
     val startTime: Long = System.currentTimeMillis(),
     val endTime: Long? = null,
     val status: ShiftStatus = ShiftStatus.ACTIVE,

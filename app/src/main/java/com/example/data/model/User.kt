@@ -4,7 +4,8 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 enum class UserRole {
-    ADMIN,
+    OWNER,
+    MANAGER,
     ATTENDANT
 }
 

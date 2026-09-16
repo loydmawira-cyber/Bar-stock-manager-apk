@@ -9,6 +9,7 @@ import com.example.data.model.CounterStock
 import com.example.data.model.CounterStockWithItem
 import com.example.data.model.Dispute
 import com.example.data.model.DisputeStatus
+import com.example.data.model.Expense
 import com.example.data.model.Item
 import com.example.data.model.ItemCategory
 import com.example.data.model.NotificationType
@@ -226,7 +227,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val user = User(
             name = name,
             role = role,
-            status = if (role == UserRole.ADMIN) UserStatus.APPROVED else UserStatus.PENDING,
+            status = if (role == UserRole.OWNER || role == UserRole.MANAGER) UserStatus.APPROVED else UserStatus.PENDING,
             email = finalEmail,
             phone = phone,
             password = password
@@ -235,7 +236,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         if (role == UserRole.ATTENDANT) {
             dao.insertNotification(
                 AppNotification(
-                    targetRole = UserRole.ADMIN,
+                    targetRole = UserRole.OWNER,
                     type = NotificationType.NEW_SIGNUP,
                     title = "New Attendant Registration",
                     message = "$name ($phone) registered as Bar Attendant and awaits approval.",
@@ -689,7 +690,7 @@ class BarStockRepository(private val dao: BarStockDao) {
             val diffStr = if (disputedItem.countedQty > disputedItem.systemQty) "+${disputedItem.countedQty - disputedItem.systemQty}" else "${disputedItem.countedQty - disputedItem.systemQty}"
             dao.insertNotification(
                 AppNotification(
-                    targetRole = UserRole.ADMIN,
+                    targetRole = UserRole.OWNER,
                     type = NotificationType.DISPUTE_RAISED,
                     title = "Dispute Raised at ${counter.name}",
                     message = "$attendantName flagged ${disputedItem.itemName}: Expected ${disputedItem.systemQty}, Counted ${disputedItem.countedQty} (Diff $diffStr).",
@@ -794,8 +795,13 @@ class BarStockRepository(private val dao: BarStockDao) {
         val counter = dao.getCounterById(counterId) ?: error("Counter not found")
         val item = dao.getItemById(itemId) ?: error("Item not found")
         if (source == "STORE") {
-            val store = dao.getStoreStock(itemId) ?: error("No store stock available for ${item.name}.")
-            require(store.currentQuantity >= quantity) { "Store stock is only ${store.currentQuantity} ${item.unitType}s." }
+            val store = dao.getStoreStock(itemId)
+            if (store == null || store.currentQuantity <= 0) {
+                throw IllegalArgumentException("No stock available in Store for this item.")
+            }
+            if (quantity > store.currentQuantity) {
+                throw IllegalArgumentException("Insufficient Store Stock. Available: ${store.currentQuantity}.")
+            }
             dao.insertStoreStock(store.copy(currentQuantity = store.currentQuantity - quantity))
         }
         addMidShiftAdjustment(counterId, itemId, quantity, adminName, "$source: ${reason.ifBlank { "Restock" }}")
@@ -833,10 +839,10 @@ class BarStockRepository(private val dao: BarStockDao) {
         )
         dao.updateStockAdjustment(updated)
 
-        // Notify Admin
+        // Notify Admin / Owner
         dao.insertNotification(
             AppNotification(
-                targetRole = UserRole.ADMIN,
+                targetRole = UserRole.OWNER,
                 type = NotificationType.MID_SHIFT_ADJUSTMENT,
                 title = "Adjustment Confirmed",
                 message = "Attendant confirmed ${adjustment.qtyAddedOrRemoved} units of ${adjustment.itemName} at ${adjustment.counterName}."
@@ -880,7 +886,7 @@ class BarStockRepository(private val dao: BarStockDao) {
 
         dao.insertNotification(
             AppNotification(
-                targetRole = UserRole.ADMIN,
+                targetRole = UserRole.OWNER,
                 type = NotificationType.DISPUTE_RAISED,
                 title = "Mid-Shift Adjustment Disputed",
                 message = "$attendantName disputed stock adjustment of ${adjustment.qtyAddedOrRemoved} units for ${adjustment.itemName}.",
@@ -1039,10 +1045,10 @@ class BarStockRepository(private val dao: BarStockDao) {
             ReconciliationType.BALANCED, ReconciliationType.NONE -> "Closed cleanly with balanced cash ($${String.format(Locale.US, "%.2f", totalExpected)})."
         }
 
-        // Notify Admin
+        // Notify Admin / Owner
         dao.insertNotification(
             AppNotification(
-                targetRole = UserRole.ADMIN,
+                targetRole = UserRole.OWNER,
                 type = NotificationType.SHIFT_CLOSED_RECONCILIATION,
                 title = "Shift Ended: ${shift.attendantName} at ${shift.counterName}",
                 message = statusMessage,
@@ -1142,4 +1148,158 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     fun getShiftClosingsFlow(shiftId: Long): Flow<List<ShiftClosing>> =
         dao.getShiftClosingsForShift(shiftId)
+
+    // --- User Actions ---
+    val owners: Flow<List<User>> = dao.getUsersByRole(UserRole.OWNER)
+    val managers: Flow<List<User>> = dao.getUsersByRole(UserRole.MANAGER)
+    suspend fun restoreUser(userId: Long) = dao.updateUserStatus(userId, UserStatus.APPROVED)
+
+    suspend fun createManagerByOwner(name: String, email: String, phone: String, initialPassword: String): Long {
+        val validation = PasswordValidator.validate(initialPassword)
+        if (!validation.isValid) {
+            throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
+        }
+        val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }.trim()
+        val existingByEmail = dao.getUserByIdentifier(finalEmail)
+        if (existingByEmail != null) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already registered to an account.")
+        }
+        val user = User(
+            name = name.trim(),
+            role = UserRole.MANAGER,
+            status = UserStatus.APPROVED,
+            email = finalEmail,
+            phone = phone.trim(),
+            password = initialPassword.trim()
+        )
+        return dao.insertUser(user)
+    }
+
+    // --- Expenses ---
+    val allExpenses: Flow<List<Expense>> = dao.getAllExpenses()
+    suspend fun addExpense(expense: Expense): Long = dao.insertExpense(expense)
+    suspend fun deleteExpense(id: Long) = dao.deleteExpense(id)
+
+    // --- Weighted-Average Costing & Financials ---
+    suspend fun getWeightedAverageCost(itemId: Long): Double {
+        val receipts = dao.getAllPurchaseReceiptsSync().filter { it.itemId == itemId }
+        val totalCost = receipts.sumOf { it.totalCost }
+        val totalUnits = receipts.sumOf { it.unitsReceived }
+        if (totalUnits > 0) {
+            return totalCost / totalUnits
+        }
+        val item = dao.getItemById(itemId) ?: return 0.0
+        return item.casePrice
+    }
+
+    suspend fun generateProfitAndLossReport(timeframe: com.example.data.model.PnlTimeframe): com.example.data.model.ProfitAndLossReport {
+        val cal = java.util.Calendar.getInstance()
+        val endDate = System.currentTimeMillis()
+        val startDate = when (timeframe) {
+            com.example.data.model.PnlTimeframe.THIS_WEEK -> {
+                cal.set(java.util.Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }
+            com.example.data.model.PnlTimeframe.THIS_MONTH -> {
+                cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }
+            com.example.data.model.PnlTimeframe.THIS_YEAR -> {
+                cal.set(java.util.Calendar.DAY_OF_YEAR, 1)
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }
+            com.example.data.model.PnlTimeframe.ALL_TIME -> 0L
+        }
+
+        val items = dao.getAllItemsSync()
+        val allShifts = dao.getAllShiftsSync().filter { (it.endTime ?: it.startTime) in startDate..endDate }
+        val matchingShiftIds = allShifts.map { it.id }.toSet()
+        val allClosings = dao.getAllShiftClosingsSync().filter { it.shiftId in matchingShiftIds }
+        val allExpensesList = dao.getAllExpensesSync().filter { it.date in startDate..endDate }
+        val allReceipts = dao.getAllPurchaseReceiptsSync().filter { it.purchaseDate in startDate..endDate }
+        val allStoreStocks = dao.getAllStoreStocksSync()
+        val allCounterStocks = dao.getAllCounterStocksSync()
+
+        val itemProfitabilities = items.map { item ->
+            val wCost = getWeightedAverageCost(item.id)
+            val itemClosings = allClosings.filter { it.itemId == item.id }
+            val unitsSold = itemClosings.sumOf { it.unitsSold }
+            val sellingPrice = item.unitPrice
+            val salesRev = unitsSold * sellingPrice
+            val cogs = unitsSold * wCost
+            val grossProfit = salesRev - cogs
+            val profitPerUnit = sellingPrice - wCost
+            val profitMarginPct = if (sellingPrice > 0) (profitPerUnit / sellingPrice) * 100.0 else 0.0
+            val isLoss = profitPerUnit < 0 || grossProfit < 0
+
+            com.example.data.model.ItemProfitability(
+                itemId = item.id,
+                itemName = item.name,
+                category = item.category,
+                weightedAvgCost = wCost,
+                sellingPrice = sellingPrice,
+                profitPerUnit = profitPerUnit,
+                profitMarginPct = profitMarginPct,
+                unitsSold = unitsSold,
+                salesRevenue = salesRev,
+                cogs = cogs,
+                grossProfit = grossProfit,
+                isLossMaking = isLoss
+            )
+        }
+
+        val totalSalesRev = itemProfitabilities.sumOf { it.salesRevenue }
+        val totalCOGS = itemProfitabilities.sumOf { it.cogs }
+        val totalGrossProfit = totalSalesRev - totalCOGS
+        val totalGrossMarginPct = if (totalSalesRev > 0) (totalGrossProfit / totalSalesRev) * 100.0 else 0.0
+        val totalExpenses = allExpensesList.sumOf { it.amount }
+        val netProfit = totalGrossProfit - totalExpenses
+
+        val currentClosingStockQty = allStoreStocks.sumOf { it.currentQuantity } + allCounterStocks.sumOf { it.currentQuantity }
+        val closingStockValue = items.sumOf { item ->
+            val storeQty = allStoreStocks.firstOrNull { it.itemId == item.id }?.currentQuantity ?: 0
+            val counterQty = allCounterStocks.filter { it.itemId == item.id }.sumOf { it.currentQuantity }
+            (storeQty + counterQty) * getWeightedAverageCost(item.id)
+        }
+
+        val purchasesReceivedQty = allReceipts.sumOf { it.unitsReceived }
+        val totalUnitsSoldInPeriod = itemProfitabilities.sumOf { it.unitsSold }
+        val openingStockQty = maxOf(0, currentClosingStockQty + totalUnitsSoldInPeriod - purchasesReceivedQty)
+        val openingStockValue = items.sumOf { item ->
+            getWeightedAverageCost(item.id) * (openingStockQty.toDouble() / maxOf(1, items.size))
+        }
+
+        val lossMaking = itemProfitabilities.filter { it.isLossMaking }
+
+        return com.example.data.model.ProfitAndLossReport(
+            timeframe = timeframe,
+            startDate = startDate,
+            endDate = endDate,
+            salesRevenue = totalSalesRev,
+            costOfGoodsSold = totalCOGS,
+            grossProfit = totalGrossProfit,
+            grossMarginPct = totalGrossMarginPct,
+            operatingExpenses = totalExpenses,
+            netProfit = netProfit,
+            openingStockQty = openingStockQty,
+            openingStockValue = openingStockValue,
+            closingStockQty = currentClosingStockQty,
+            closingStockValue = closingStockValue,
+            stockVarianceQty = 0,
+            itemProfitabilities = itemProfitabilities,
+            lossMakingItems = lossMaking
+        )
+    }
 }

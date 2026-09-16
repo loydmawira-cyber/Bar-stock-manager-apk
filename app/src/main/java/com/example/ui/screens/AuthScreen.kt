@@ -90,7 +90,9 @@ import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.ui.components.StrongPasswordField
 import com.example.ui.components.UserStatusBadge
+import com.example.ui.components.requiredLabel
 import com.example.ui.theme.AmberPrimary
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
 
@@ -344,6 +346,10 @@ private fun LoginFormContent(
     onRegisterBar: () -> Unit,
     onNext: () -> Unit
 ) {
+    val isIdentifierValid = identifier.trim().isNotBlank()
+    val isPasswordValid = password.isNotBlank()
+    val isFormValid = isIdentifierValid && isPasswordValid
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(18.dp),
@@ -358,7 +364,9 @@ private fun LoginFormContent(
             OutlinedTextField(
                 value = identifier,
                 onValueChange = onIdentifierChange,
-                label = { Text("Email or Phone Number") },
+                label = requiredLabel("Email or Phone Number"),
+                isError = identifier.isNotEmpty() && !isIdentifierValid,
+                supportingText = if (identifier.isNotEmpty() && !isIdentifierValid) { { Text("Email or phone number required", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. admin@barstock.com or +254...") },
                 leadingIcon = {
                     Icon(
@@ -389,7 +397,9 @@ private fun LoginFormContent(
             OutlinedTextField(
                 value = password,
                 onValueChange = onPasswordChange,
-                label = { Text("Password") },
+                label = requiredLabel("Password"),
+                isError = password.isNotEmpty() && !isPasswordValid,
+                supportingText = if (password.isNotEmpty() && !isPasswordValid) { { Text("Password required", color = CrimsonRed) } } else null,
                 placeholder = { Text("Enter your password") },
                 leadingIcon = {
                     Icon(
@@ -411,7 +421,7 @@ private fun LoginFormContent(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                keyboardActions = KeyboardActions(onDone = { if (isFormValid) onSubmit() }),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -446,7 +456,10 @@ private fun LoginFormContent(
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
-                onClick = onSubmit,
+                onClick = {
+                    if (isFormValid) onSubmit()
+                },
+                enabled = isFormValid,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AmberPrimary,
                     contentColor = Color.Black
@@ -528,6 +541,14 @@ private fun RegisterBarFormContent(
     onBackToLogin: () -> Unit,
     onNext: () -> Unit
 ) {
+    val isBarNameValid = barName.trim().isNotBlank()
+    val isLocationValid = location.trim().isNotBlank()
+    val isAdminNameValid = adminName.trim().isNotBlank()
+    val isPhoneValid = phone.trim().isNotBlank()
+    val isEmailValid = email.trim().isNotBlank() && email.contains("@")
+    val isPasswordValid = com.example.data.util.PasswordValidator.validate(password).isValid
+    val isFormValid = isBarNameValid && isLocationValid && isAdminNameValid && isPhoneValid && isEmailValid && isPasswordValid
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(18.dp),
@@ -551,7 +572,9 @@ private fun RegisterBarFormContent(
             OutlinedTextField(
                 value = barName,
                 onValueChange = onBarNameChange,
-                label = { Text("Bar / Club Name *") },
+                label = requiredLabel("Bar / Club Name"),
+                isError = barName.isNotEmpty() && !isBarNameValid,
+                supportingText = if (barName.isNotEmpty() && !isBarNameValid) { { Text("Bar name required", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. Royal Lounge & Club") },
                 leadingIcon = { Icon(Icons.Filled.LocalBar, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -573,7 +596,9 @@ private fun RegisterBarFormContent(
             OutlinedTextField(
                 value = location,
                 onValueChange = onLocationChange,
-                label = { Text("Location / City *") },
+                label = requiredLabel("Location / City"),
+                isError = location.isNotEmpty() && !isLocationValid,
+                supportingText = if (location.isNotEmpty() && !isLocationValid) { { Text("Location required", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. Westlands, Nairobi") },
                 leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -604,7 +629,9 @@ private fun RegisterBarFormContent(
             OutlinedTextField(
                 value = adminName,
                 onValueChange = onAdminNameChange,
-                label = { Text("Admin / Owner Full Name *") },
+                label = requiredLabel("Admin / Owner Full Name"),
+                isError = adminName.isNotEmpty() && !isAdminNameValid,
+                supportingText = if (adminName.isNotEmpty() && !isAdminNameValid) { { Text("Admin full name required", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. Sarah Jenkins") },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -626,7 +653,9 @@ private fun RegisterBarFormContent(
             OutlinedTextField(
                 value = phone,
                 onValueChange = onPhoneChange,
-                label = { Text("Admin Phone Number *") },
+                label = requiredLabel("Admin Phone Number"),
+                isError = phone.isNotEmpty() && !isPhoneValid,
+                supportingText = if (phone.isNotEmpty() && !isPhoneValid) { { Text("Phone number required", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. +254 700 123456") },
                 leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
@@ -651,9 +680,9 @@ private fun RegisterBarFormContent(
             OutlinedTextField(
                 value = email,
                 onValueChange = onEmailChange,
-                label = { Text("Admin Email * (Compulsory)") },
-                placeholder = { Text("e.g. admin@royallounge.com") },
-                supportingText = { Text("Compulsory — used to reset your password if forgotten.") },
+                label = requiredLabel("Admin Email"),
+                isError = email.isNotEmpty() && !isEmailValid,
+                supportingText = if (email.isNotEmpty() && !isEmailValid) { { Text("Valid email required for password resets", color = CrimsonRed) } } else { { Text("Compulsory — used to reset your password if forgotten.") } },
                 leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
@@ -682,13 +711,16 @@ private fun RegisterBarFormContent(
                 modifier = Modifier.fillMaxWidth(),
                 testTag = "reg_admin_password_input",
                 imeAction = ImeAction.Done,
-                onDone = { onSubmit() }
+                onDone = { if (isFormValid) onSubmit() }
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Button(
-                onClick = onSubmit,
+                onClick = {
+                    if (isFormValid) onSubmit()
+                },
+                enabled = isFormValid,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AmberPrimary,
                     contentColor = Color.Black
@@ -787,17 +819,20 @@ private fun ResetPasswordFormContent(
                 }
             }
 
+            val isEmailValid = email.trim().isNotBlank() && email.contains("@")
             OutlinedTextField(
                 value = email,
                 onValueChange = onEmailChange,
-                label = { Text("Registered Email Address *") },
+                label = requiredLabel("Registered Email Address"),
+                isError = email.isNotEmpty() && !isEmailValid,
+                supportingText = if (email.isNotEmpty() && !isEmailValid) { { Text("Enter a valid email address", color = CrimsonRed) } } else null,
                 placeholder = { Text("e.g. admin@barstock.com") },
                 leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { onSubmitResetEmail() }),
+                keyboardActions = KeyboardActions(onDone = { if (isEmailValid && !isSending) onSubmitResetEmail() }),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -814,7 +849,7 @@ private fun ResetPasswordFormContent(
 
             Button(
                 onClick = onSubmitResetEmail,
-                enabled = !isSending && email.isNotBlank(),
+                enabled = !isSending && isEmailValid,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AmberPrimary,
                     contentColor = Color.Black
@@ -905,15 +940,15 @@ private fun QuickProfilesContent(
                                     .size(38.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (user.role == UserRole.ADMIN) AmberPrimary.copy(alpha = 0.2f)
+                                        if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) AmberPrimary.copy(alpha = 0.2f)
                                         else EmeraldGreen.copy(alpha = 0.2f)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (user.role == UserRole.ADMIN) Icons.Outlined.Shield else Icons.Filled.Person,
+                                    imageVector = if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) Icons.Outlined.Shield else Icons.Filled.Person,
                                     contentDescription = null,
-                                    tint = if (user.role == UserRole.ADMIN) AmberPrimary else EmeraldGreen,
+                                    tint = if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) AmberPrimary else EmeraldGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }

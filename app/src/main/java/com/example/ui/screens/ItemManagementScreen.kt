@@ -63,6 +63,9 @@ import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.ui.components.CategoryBadge
 import com.example.ui.components.LocalCurrencySymbol
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.components.formatCurrency
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
@@ -188,7 +191,7 @@ fun ItemManagementScreen(
                     }
                 }
 
-                if (currentUser?.role == UserRole.ADMIN) {
+                if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                     Button(
                         onClick = {
                             itemName = ""
@@ -218,7 +221,7 @@ fun ItemManagementScreen(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = currentUser?.role == UserRole.ADMIN) { openEditDialog(item) }
+                    .clickable(enabled = currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) { openEditDialog(item) }
             ) {
                 Row(
                     modifier = Modifier
@@ -283,7 +286,7 @@ fun ItemManagementScreen(
                             }
                         }
 
-                        if (currentUser?.role == UserRole.ADMIN) {
+                        if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                             IconButton(
                                 onClick = { openEditDialog(item) },
                                 modifier = Modifier.size(32.dp)
@@ -308,6 +311,12 @@ fun ItemManagementScreen(
 
     // Add Item Dialog
     if (showAddItemDialog) {
+        val uPriceVal = itemUnitPrice.toDoubleOrNull()
+        val isNameValid = itemName.trim().isNotBlank()
+        val isPriceValid = uPriceVal != null && uPriceVal > 0.0
+        val isUnitValid = itemUnitType.trim().isNotBlank()
+        val isFormValid = isNameValid && isPriceValid && isUnitValid
+
         AlertDialog(
             onDismissRequest = { showAddItemDialog = false },
             title = { Text("Add Beverage & Set Prices", fontWeight = FontWeight.Bold) },
@@ -316,7 +325,9 @@ fun ItemManagementScreen(
                     OutlinedTextField(
                         value = itemName,
                         onValueChange = { itemName = it },
-                        label = { Text("Beverage / Brand Name") },
+                        label = requiredLabel("Beverage / Brand Name"),
+                        isError = itemName.isNotEmpty() && !isNameValid,
+                        supportingText = if (itemName.isNotEmpty() && !isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("stock_item_name_input"),
@@ -332,7 +343,7 @@ fun ItemManagementScreen(
                             value = itemCategory.name,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Category") },
+                            label = requiredLabel("Category"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategoryMenu) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -369,7 +380,9 @@ fun ItemManagementScreen(
                         OutlinedTextField(
                             value = itemUnitPrice,
                             onValueChange = { itemUnitPrice = it },
-                            label = { Text("Selling Unit Price ($currency)") },
+                            label = requiredLabel("Selling Price ($currency)"),
+                            isError = itemUnitPrice.isNotEmpty() && !isPriceValid,
+                            supportingText = if (itemUnitPrice.isNotEmpty() && !isPriceValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             singleLine = true,
@@ -379,7 +392,7 @@ fun ItemManagementScreen(
                         OutlinedTextField(
                             value = itemCasePrice,
                             onValueChange = { itemCasePrice = it },
-                            label = { Text("Case Bulk Price ($currency)") },
+                            label = optionalLabel("Case Price ($currency)"),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             singleLine = true,
@@ -390,7 +403,9 @@ fun ItemManagementScreen(
                     OutlinedTextField(
                         value = itemUnitType,
                         onValueChange = { itemUnitType = it },
-                        label = { Text("Unit Type (e.g. Bottle, Shot, Can, Glass)") },
+                        label = requiredLabel("Unit Type"),
+                        isError = itemUnitType.isNotEmpty() && !isUnitValid,
+                        supportingText = if (itemUnitType.isNotEmpty() && !isUnitValid) { { Text("Unit type required", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -401,12 +416,13 @@ fun ItemManagementScreen(
                     onClick = {
                         val uPrice = itemUnitPrice.toDoubleOrNull() ?: 0.0
                         val cPrice = itemCasePrice.toDoubleOrNull() ?: 0.0
-                        if (itemName.isNotBlank() && uPrice > 0) {
-                            onCreateItem(itemName, itemCategory, uPrice, cPrice, itemUnitType, itemDesc)
+                        if (isFormValid) {
+                            onCreateItem(itemName.trim(), itemCategory, uPrice, cPrice, itemUnitType.trim(), itemDesc.trim())
                             showAddItemDialog = false
                             itemName = ""
                         }
                     },
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
                 ) {
                     Text("Save Item", color = Color.Black, fontWeight = FontWeight.Bold)
@@ -420,6 +436,12 @@ fun ItemManagementScreen(
 
     // Edit Item Dialog
     editingItem?.let { targetItem ->
+        val uPriceVal = itemUnitPrice.toDoubleOrNull()
+        val isNameValid = itemName.trim().isNotBlank()
+        val isPriceValid = uPriceVal != null && uPriceVal > 0.0
+        val isUnitValid = itemUnitType.trim().isNotBlank()
+        val isFormValid = isNameValid && isPriceValid && isUnitValid
+
         AlertDialog(
             onDismissRequest = { editingItem = null },
             title = { Text("Edit Item & Price", fontWeight = FontWeight.Bold) },
@@ -428,7 +450,9 @@ fun ItemManagementScreen(
                     OutlinedTextField(
                         value = itemName,
                         onValueChange = { itemName = it },
-                        label = { Text("Beverage Name") },
+                        label = requiredLabel("Beverage Name"),
+                        isError = !isNameValid,
+                        supportingText = if (!isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
@@ -441,7 +465,9 @@ fun ItemManagementScreen(
                         OutlinedTextField(
                             value = itemUnitPrice,
                             onValueChange = { itemUnitPrice = it },
-                            label = { Text("Unit Selling Price ($currency)") },
+                            label = requiredLabel("Unit Selling Price ($currency)"),
+                            isError = !isPriceValid,
+                            supportingText = if (!isPriceValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             singleLine = true,
@@ -451,7 +477,7 @@ fun ItemManagementScreen(
                         OutlinedTextField(
                             value = itemCasePrice,
                             onValueChange = { itemCasePrice = it },
-                            label = { Text("Case Bulk Price ($currency)") },
+                            label = optionalLabel("Case Bulk Price ($currency)"),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1f),
                             singleLine = true,
@@ -462,7 +488,9 @@ fun ItemManagementScreen(
                     OutlinedTextField(
                         value = itemUnitType,
                         onValueChange = { itemUnitType = it },
-                        label = { Text("Unit Type (Bottle / Shot / Can / Glass)") },
+                        label = requiredLabel("Unit Type"),
+                        isError = !isUnitValid,
+                        supportingText = if (!isUnitValid) { { Text("Unit type required", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -486,11 +514,12 @@ fun ItemManagementScreen(
                         onClick = {
                             val uPrice = itemUnitPrice.toDoubleOrNull() ?: 0.0
                             val cPrice = itemCasePrice.toDoubleOrNull() ?: 0.0
-                            if (itemName.isNotBlank() && uPrice > 0) {
-                                onUpdateItem(targetItem.id, itemName, itemCategory, uPrice, cPrice, itemUnitType, itemDesc)
+                            if (isFormValid) {
+                                onUpdateItem(targetItem.id, itemName.trim(), itemCategory, uPrice, cPrice, itemUnitType.trim(), itemDesc.trim())
                                 editingItem = null
                             }
                         },
+                        enabled = isFormValid,
                         colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
                     ) {
                         Text("Update Price", color = Color.Black, fontWeight = FontWeight.Bold)

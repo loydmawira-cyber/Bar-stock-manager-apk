@@ -72,6 +72,8 @@ import com.example.data.model.UserRole
 import com.example.data.model.StoreStockWithItem
 import com.example.ui.components.CategoryBadge
 import com.example.ui.components.StatusBadge
+import com.example.ui.components.optionalLabel
+import com.example.ui.components.requiredLabel
 import com.example.ui.components.formatCurrency
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
@@ -143,7 +145,7 @@ fun CounterManagementScreen(
                     letterSpacing = 1.sp
                 )
 
-                if (currentUser?.role == UserRole.ADMIN) {
+                if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                     Button(
                         onClick = { showCreateCounterDialog = true },
                         colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
@@ -178,7 +180,7 @@ fun CounterManagementScreen(
                                     .combinedClickable(
                                         onClick = { onSelectCounter(counter.id) },
                                         onLongClick = {
-                                            if (currentUser?.role == UserRole.ADMIN) {
+                                            if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                                                 onSelectCounter(counter.id)
                                                 showDropdown = true
                                             }
@@ -297,7 +299,7 @@ fun CounterManagementScreen(
                             }
                         }
 
-                        if (currentUser?.role == UserRole.ADMIN) {
+                        if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                             Spacer(modifier = Modifier.height(14.dp))
 
                             Row(
@@ -414,7 +416,7 @@ fun CounterManagementScreen(
                                     }
                                 }
 
-                                if (currentUser?.role == UserRole.ADMIN) {
+                                if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                                     IconButton(
                                         onClick = {
                                             selectedItemForAssign = allItems.find { it.id == stock.itemId }
@@ -447,6 +449,10 @@ fun CounterManagementScreen(
 
     // Create Counter Dialog
     if (showCreateCounterDialog) {
+        val isNameValid = newCounterName.trim().isNotBlank()
+        val isLocValid = newCounterLocation.trim().isNotBlank()
+        val isFormValid = isNameValid && isLocValid
+
         AlertDialog(
             onDismissRequest = { showCreateCounterDialog = false },
             title = { Text("Create New Selling Counter", fontWeight = FontWeight.Bold) },
@@ -455,7 +461,9 @@ fun CounterManagementScreen(
                     OutlinedTextField(
                         value = newCounterName,
                         onValueChange = { newCounterName = it },
-                        label = { Text("Counter Name (e.g. Rooftop Bar)") },
+                        label = requiredLabel("Counter Name (e.g. Rooftop Bar)"),
+                        isError = newCounterName.isNotEmpty() && !isNameValid,
+                        supportingText = if (newCounterName.isNotEmpty() && !isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("new_counter_name_input"),
@@ -466,7 +474,9 @@ fun CounterManagementScreen(
                     OutlinedTextField(
                         value = newCounterLocation,
                         onValueChange = { newCounterLocation = it },
-                        label = { Text("Physical Location (e.g. 3rd Floor Poolside)") },
+                        label = requiredLabel("Physical Location (e.g. 3rd Floor Poolside)"),
+                        isError = newCounterLocation.isNotEmpty() && !isLocValid,
+                        supportingText = if (newCounterLocation.isNotEmpty() && !isLocValid) { { Text("Location cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
@@ -476,13 +486,14 @@ fun CounterManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (newCounterName.isNotBlank()) {
-                            onCreateCounter(newCounterName, newCounterLocation)
+                        if (isFormValid) {
+                            onCreateCounter(newCounterName.trim(), newCounterLocation.trim())
                             showCreateCounterDialog = false
                             newCounterName = ""
                             newCounterLocation = ""
                         }
                     },
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
                 ) {
                     Text("Create Counter", color = Color.Black, fontWeight = FontWeight.Bold)
@@ -496,6 +507,10 @@ fun CounterManagementScreen(
 
     // Edit Counter Dialog
     counterToEdit?.let { counter ->
+        val isNameValid = editNameInput.trim().isNotBlank()
+        val isLocValid = editLocationInput.trim().isNotBlank()
+        val isFormValid = isNameValid && isLocValid
+
         AlertDialog(
             onDismissRequest = { counterToEdit = null },
             title = { Text("Edit Counter Details", fontWeight = FontWeight.Bold) },
@@ -504,7 +519,9 @@ fun CounterManagementScreen(
                     OutlinedTextField(
                         value = editNameInput,
                         onValueChange = { editNameInput = it },
-                        label = { Text("Counter Name *") },
+                        label = requiredLabel("Counter Name"),
+                        isError = !isNameValid,
+                        supportingText = if (!isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
@@ -513,7 +530,9 @@ fun CounterManagementScreen(
                     OutlinedTextField(
                         value = editLocationInput,
                         onValueChange = { editLocationInput = it },
-                        label = { Text("Physical Location") },
+                        label = requiredLabel("Physical Location"),
+                        isError = !isLocValid,
+                        supportingText = if (!isLocValid) { { Text("Location cannot be blank", color = CrimsonRed) } } else null,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
@@ -523,11 +542,12 @@ fun CounterManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (editNameInput.isNotBlank()) {
-                            onUpdateCounter(counter.id, editNameInput, editLocationInput)
+                        if (isFormValid) {
+                            onUpdateCounter(counter.id, editNameInput.trim(), editLocationInput.trim())
                             counterToEdit = null
                         }
                     },
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary)
                 ) {
                     Text("Save Changes", color = Color.Black, fontWeight = FontWeight.Bold)
@@ -571,6 +591,19 @@ fun CounterManagementScreen(
         val qtyToAdd = assignInitialQtyText.toIntOrNull() ?: 0
         val projectedTotal = currentExistingQty + maxOf(0, qtyToAdd)
 
+        val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForAssign?.id }?.currentQuantity ?: 0
+        val isItemValid = selectedItemForAssign != null
+        val isQtyValid = qtyToAdd > 0
+        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && qtyToAdd <= availableAtStore)
+
+        val isSupplierValid = restockSupplier.trim().isNotBlank()
+        val isReceiptValid = restockReceiptNumber.trim().isNotBlank()
+        val costVal = restockUnitCost.toDoubleOrNull()
+        val isCostValid = costVal != null && costVal > 0.0
+
+        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid)
+        val isFormValid = isItemValid && isQtyValid && isStoreQtyValid && isSupplierFormValid
+
         AlertDialog(
             onDismissRequest = { showAssignItemDialog = false },
             title = {
@@ -589,7 +622,7 @@ fun CounterManagementScreen(
                             value = selectedItemForAssign?.let { "${it.name} (${it.category.name})" } ?: "Select Item",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Alcohol / Beverage") },
+                            label = requiredLabel("Alcohol / Beverage"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedItemMenu) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -634,7 +667,7 @@ fun CounterManagementScreen(
                             value = if (restockSource == "STORE") "From Store" else "Direct from Supplier",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Restock Source") },
+                            label = requiredLabel("Restock Source"),
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRestockSource) },
                             modifier = Modifier.fillMaxWidth().menuAnchor()
                         )
@@ -645,18 +678,39 @@ fun CounterManagementScreen(
                     }
 
                     if (restockSource == "SUPPLIER") {
-                        OutlinedTextField(restockSupplier, { restockSupplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                        OutlinedTextField(restockReceiptNumber, { restockReceiptNumber = it }, label = { Text("Receipt / Invoice Number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                         OutlinedTextField(
-                            restockUnitCost,
-                            { restockUnitCost = it },
-                            label = { Text("Cost per unit (required)") },
-                            supportingText = { if ((restockUnitCost.toDoubleOrNull() ?: 0.0) <= 0.0) Text("Enter a cost greater than 0 to create the purchase receipt.") },
+                            value = restockSupplier,
+                            onValueChange = { restockSupplier = it },
+                            label = requiredLabel("Supplier"),
+                            isError = restockSupplier.isNotEmpty() && !isSupplierValid,
+                            supportingText = if (restockSupplier.isNotEmpty() && !isSupplierValid) { { Text("Supplier name required", color = CrimsonRed) } } else null,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = restockReceiptNumber,
+                            onValueChange = { restockReceiptNumber = it },
+                            label = requiredLabel("Receipt / Invoice Number"),
+                            isError = restockReceiptNumber.isNotEmpty() && !isReceiptValid,
+                            supportingText = if (restockReceiptNumber.isNotEmpty() && !isReceiptValid) { { Text("Receipt number required", color = CrimsonRed) } } else null,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = restockUnitCost,
+                            onValueChange = { restockUnitCost = it },
+                            label = requiredLabel("Cost per unit"),
+                            isError = restockUnitCost.isNotEmpty() && !isCostValid,
+                            supportingText = if (restockUnitCost.isNotEmpty() && !isCostValid) {
+                                { Text("Cost must be > 0", color = CrimsonRed) }
+                            } else {
+                                { Text("Cost per unit to create purchase receipt.") }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
                     } else {
-                        val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForAssign?.id }?.currentQuantity ?: 0
                         Text("Available at Store: $availableAtStore ${selectedItemForAssign?.unitType ?: "units"}", color = EmeraldGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
@@ -690,13 +744,26 @@ fun CounterManagementScreen(
                         }
                     }
 
+                    val hasNoStoreStock = restockSource == "STORE" && availableAtStore <= 0
+                    val isExceedingStoreStock = restockSource == "STORE" && availableAtStore > 0 && qtyToAdd > availableAtStore
+                    val hasQtyError = (assignInitialQtyText.isNotEmpty() && !isQtyValid) || hasNoStoreStock || (assignInitialQtyText.isNotEmpty() && isExceedingStoreStock)
+
                     OutlinedTextField(
                         value = assignInitialQtyText,
                         onValueChange = { assignInitialQtyText = it },
-                        label = { Text("Quantity to Add (+ Units)") },
+                        label = requiredLabel("Quantity to Add (+ Units)"),
                         placeholder = { Text("e.g. 10 or 24") },
+                        isError = hasQtyError,
                         supportingText = {
-                            Text("Adjusts stock: $currentExistingQty existing + ${maxOf(0, qtyToAdd)} added = $projectedTotal total units")
+                            if (hasNoStoreStock) {
+                                Text("No stock available in Store for this item.", color = CrimsonRed)
+                            } else if (assignInitialQtyText.isNotEmpty() && isExceedingStoreStock) {
+                                Text("Insufficient Store Stock. Available: $availableAtStore.", color = CrimsonRed)
+                            } else if (assignInitialQtyText.isNotEmpty() && !isQtyValid) {
+                                Text("Quantity must be greater than 0", color = CrimsonRed)
+                            } else {
+                                Text("Adjusts stock: $currentExistingQty existing + ${maxOf(0, qtyToAdd)} added = $projectedTotal total units")
+                            }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
@@ -711,14 +778,14 @@ fun CounterManagementScreen(
                         val item = selectedItemForAssign
                         val qty = assignInitialQtyText.toIntOrNull() ?: 0
                         val cost = restockUnitCost.toDoubleOrNull() ?: 0.0
-                        if (item != null && qty > 0 && (restockSource != "SUPPLIER" || cost > 0.0)) {
+                        if (isFormValid && item != null) {
                             onRestockCounterFromSource(
                                 activeCounter.id,
                                 item.id,
                                 qty,
                                 restockSource,
-                                restockSupplier,
-                                restockReceiptNumber,
+                                restockSupplier.trim(),
+                                restockReceiptNumber.trim(),
                                 cost,
                                 "Inventory counter restock"
                             )
@@ -726,7 +793,7 @@ fun CounterManagementScreen(
                             assignInitialQtyText = ""
                         }
                     },
-                    enabled = restockSource != "SUPPLIER" || (restockUnitCost.toDoubleOrNull() ?: 0.0) > 0.0,
+                    enabled = isFormValid,
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
                 ) {
                     Text(

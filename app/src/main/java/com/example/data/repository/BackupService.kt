@@ -32,7 +32,7 @@ class BackupService(private val dao: BarStockDao) {
                 return "bar_" + ownProfile!!.barId
             }
         }
-        val admin = dao.getAllUsersSync().firstOrNull { it.role.name == "ADMIN" }
+        val admin = dao.getAllUsersSync().firstOrNull { it.role.name == "OWNER" || it.role.name == "ADMIN" }
         val profile = dao.getBarProfileSync()
         val identity = identityOverride?.trim()?.takeIf { it.isNotBlank() }
             ?: admin?.email?.trim()?.takeIf { it.isNotBlank() }
@@ -58,7 +58,8 @@ class BackupService(private val dao: BarStockDao) {
             disputes = dao.getAllDisputesSync(),
             stockAdjustments = dao.getAllStockAdjustmentsSync(),
             reconciliations = dao.getAllReconciliationsSync(),
-            notifications = dao.getAllNotificationsSync()
+            notifications = dao.getAllNotificationsSync(),
+            expenses = dao.getAllExpensesSync()
         )
     }
 
@@ -69,7 +70,7 @@ class BackupService(private val dao: BarStockDao) {
         val now = System.currentTimeMillis()
         val targetId = backupId ?: tenantId()
 
-        val adminUser = snap.users.firstOrNull { it.role.name == "ADMIN" }
+        val adminUser = snap.users.firstOrNull { it.role.name == "OWNER" || it.role.name == "ADMIN" }
         val activeUsers = snap.users.filter { it.status.name != "REVOKED" }
         val userEmails = activeUsers.mapNotNull { it.email.takeIf { e -> e.isNotBlank() }?.lowercase(java.util.Locale.ROOT) }
         val userPhones = activeUsers.mapNotNull { it.phone.takeIf { p -> p.isNotBlank() } }
@@ -215,6 +216,7 @@ class BackupService(private val dao: BarStockDao) {
         dao.clearCounters()
         dao.clearItems()
         dao.clearUsers()
+        dao.clearExpenses()
 
         data.users.forEach { dao.insertUser(it) }
         data.items.forEach { dao.insertItem(it) }
@@ -229,5 +231,6 @@ class BackupService(private val dao: BarStockDao) {
         data.stockAdjustments.forEach { dao.insertStockAdjustment(it) }
         data.reconciliations.forEach { dao.insertReconciliation(it) }
         data.notifications.forEach { dao.insertNotification(it) }
+        data.expenses.forEach { dao.insertExpense(it) }
     }
 }

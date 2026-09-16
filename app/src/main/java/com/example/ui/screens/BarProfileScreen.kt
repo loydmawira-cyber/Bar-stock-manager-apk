@@ -72,7 +72,9 @@ import com.example.ui.components.BAR_ICON_PRESETS
 import com.example.ui.components.BarLogoIcon
 import com.example.ui.components.GoogleBillingAdminSection
 import com.example.ui.components.StatusBadge
+import com.example.ui.components.requiredLabel
 import com.example.ui.theme.AmberPrimary
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
@@ -137,7 +139,7 @@ fun BarProfileScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (currentUser?.role == UserRole.ADMIN) "LIVE BRANDING PREVIEW" else "MY STATION PROFILE",
+                        text = if (currentUser?.role == UserRole.OWNER) "LIVE BRANDING PREVIEW" else "MY STATION PROFILE",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = AmberPrimary,
@@ -149,7 +151,7 @@ fun BarProfileScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (currentUser?.role == UserRole.ADMIN) "Multi-Bar Ready" else "Active Attendant",
+                            text = if (currentUser?.role == UserRole.OWNER) "Multi-Bar Ready" else "Active Attendant",
                             color = EmeraldGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -286,7 +288,7 @@ fun BarProfileScreen(
             }
         }
 
-        if (currentUser?.role == UserRole.ADMIN) {
+        if (currentUser?.role == UserRole.OWNER) {
             // Section: Visual Identity & Icon / Photo Selection
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -378,10 +380,16 @@ fun BarProfileScreen(
                         modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
                     )
 
+                    val isBarNameValid = barName.trim().isNotBlank()
+                    val isLocationValid = location.trim().isNotBlank()
+                    val isProfileFormValid = isBarNameValid && isLocationValid
+
                     OutlinedTextField(
                         value = barName,
                         onValueChange = { barName = it },
-                        label = { Text("Bar / Establishment Name *") },
+                        label = requiredLabel("Bar / Establishment Name"),
+                        isError = barName.isNotEmpty() && !isBarNameValid,
+                        supportingText = if (barName.isNotEmpty() && !isBarNameValid) { { Text("Bar name required", color = CrimsonRed) } } else null,
                         leadingIcon = { Icon(Icons.Outlined.Storefront, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -398,7 +406,9 @@ fun BarProfileScreen(
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it },
-                        label = { Text("Physical Location / Address *") },
+                        label = requiredLabel("Physical Location / Address"),
+                        isError = location.isNotEmpty() && !isLocationValid,
+                        supportingText = if (location.isNotEmpty() && !isLocationValid) { { Text("Location required", color = CrimsonRed) } } else null,
                         leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -487,21 +497,28 @@ fun BarProfileScreen(
             }
         }
 
-        if (currentUser?.role == UserRole.ADMIN) {
+        if (currentUser?.role == UserRole.OWNER) {
+            val isBarNameValid = barName.trim().isNotBlank()
+            val isLocationValid = location.trim().isNotBlank()
+            val isProfileFormValid = isBarNameValid && isLocationValid
+
             // Save & Quick Links
             Button(
                 onClick = {
-                    onSaveProfile(
-                        barName,
-                        location,
-                        selectedIcon,
-                        customPhotoUri.ifBlank { null },
-                        contactPhone,
-                        currencySymbol,
-                        managerName,
-                        openingHours
-                    )
+                    if (isProfileFormValid) {
+                        onSaveProfile(
+                            barName.trim(),
+                            location.trim(),
+                            selectedIcon,
+                            customPhotoUri.trim().ifBlank { null },
+                            contactPhone.trim(),
+                            currencySymbol.trim(),
+                            managerName.trim(),
+                            openingHours.trim()
+                        )
+                    }
                 },
+                enabled = isProfileFormValid,
                 colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier

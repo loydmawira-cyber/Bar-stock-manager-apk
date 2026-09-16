@@ -58,6 +58,8 @@ import com.example.ui.screens.ShiftStartVerificationScreen
 import com.example.ui.screens.ShiftSummaryScreen
 import com.example.ui.screens.StoreInventoryScreen
 import com.example.ui.screens.ReceiptsScreen
+import com.example.ui.screens.ExpensesScreen
+import com.example.ui.screens.ProfitAndLossScreen
 import com.example.ui.screens.UserManagementScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AppScreen
@@ -159,22 +161,24 @@ fun BarStockApp(viewModel: BarStockViewModel) {
 
     CompositionLocalProvider(LocalCurrencySymbol provides currencySymbol) {
         val screenTitle = when (currentScreen) {
-        AppScreen.AUTH -> "Sign In"
-        AppScreen.ADMIN_DASHBOARD -> barProfile.barName.ifBlank { "Bar Dashboard" }
-        AppScreen.ATTENDANT_DASHBOARD -> "Attendant Station"
-        AppScreen.BAR_PROFILE -> "Bar Profile & Branding"
-        AppScreen.SHIFT_VERIFICATION -> "Verify Opening Stock"
-        AppScreen.ACTIVE_SHIFT -> "Active Shift"
-        AppScreen.SHIFT_CLOSING -> "Shift Closing"
-        AppScreen.SHIFT_SUMMARY -> "Reconciliation Receipt"
-        AppScreen.DISPUTES -> "Dispute Center"
-        AppScreen.LEDGER -> "Receipts"
-        AppScreen.STORE_INVENTORY -> "Store Inventory"
-        AppScreen.COUNTERS_MANAGEMENT -> "Selling Counters"
-        AppScreen.ITEMS_MANAGEMENT -> "Stock Prices"
-        AppScreen.USERS_MANAGEMENT -> "Attendant Logins"
-        AppScreen.NOTIFICATIONS -> "Notification Center"
-    }
+            AppScreen.AUTH -> "Sign In"
+            AppScreen.ADMIN_DASHBOARD -> barProfile.barName.ifBlank { "Bar Dashboard" }
+            AppScreen.ATTENDANT_DASHBOARD -> "Attendant Station"
+            AppScreen.BAR_PROFILE -> "Bar Profile & Branding"
+            AppScreen.SHIFT_VERIFICATION -> "Verify Opening Stock"
+            AppScreen.ACTIVE_SHIFT -> "Active Shift"
+            AppScreen.SHIFT_CLOSING -> "Shift Closing"
+            AppScreen.SHIFT_SUMMARY -> "Reconciliation Receipt"
+            AppScreen.DISPUTES -> "Dispute Center"
+            AppScreen.LEDGER -> "Receipts"
+            AppScreen.STORE_INVENTORY -> "Store Inventory"
+            AppScreen.COUNTERS_MANAGEMENT -> "Selling Counters"
+            AppScreen.ITEMS_MANAGEMENT -> "Stock Prices"
+            AppScreen.USERS_MANAGEMENT -> if (currentUser?.role == UserRole.OWNER) "User Hierarchy" else "Attendant Logins"
+            AppScreen.EXPENSES_MANAGEMENT -> "Expense Management"
+            AppScreen.PROFIT_LOSS_REPORT -> "Profit & Loss Reports"
+            AppScreen.NOTIFICATIONS -> "Notification Center"
+        }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -193,13 +197,13 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         val user = currentUser
                         if (user != null) {
                             if (currentScreen == AppScreen.SHIFT_VERIFICATION || currentScreen == AppScreen.SHIFT_SUMMARY) {
-                                viewModel.navigateTo(if (user.role == UserRole.ADMIN) AppScreen.ADMIN_DASHBOARD else AppScreen.ATTENDANT_DASHBOARD)
+                                viewModel.navigateTo(if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) AppScreen.ADMIN_DASHBOARD else AppScreen.ATTENDANT_DASHBOARD)
                             } else if (currentScreen == AppScreen.ACTIVE_SHIFT) {
                                 viewModel.navigateTo(AppScreen.ATTENDANT_DASHBOARD)
                             } else if (currentScreen == AppScreen.SHIFT_CLOSING) {
                                 viewModel.navigateTo(AppScreen.ACTIVE_SHIFT)
                             } else {
-                                viewModel.navigateTo(if (user.role == UserRole.ADMIN) AppScreen.ADMIN_DASHBOARD else AppScreen.ATTENDANT_DASHBOARD)
+                                viewModel.navigateTo(if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) AppScreen.ADMIN_DASHBOARD else AppScreen.ATTENDANT_DASHBOARD)
                             }
                         }
                     },
@@ -211,7 +215,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
             }
         },
         bottomBar = {
-            if (currentUser?.role == UserRole.ADMIN && currentScreen != AppScreen.AUTH) {
+            if ((currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) && currentScreen != AppScreen.AUTH) {
                 val openDisputesCount = allDisputes.count { it.status == com.example.data.model.DisputeStatus.OPEN }
                 val pendingUsersCount = pendingUsers.size
                 AdminBottomNavigationBar(
@@ -286,6 +290,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         counters = allCounters,
                         items = allItems,
                         shifts = allShifts,
+                        currentUserRole = currentUser?.role ?: UserRole.OWNER,
                         storeStock = storeStock,
                         shiftClosings = allShiftClosings,
                         disputes = allDisputes,
@@ -420,7 +425,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         closings = lastShiftClosings,
                         onReturnToDashboard = {
                             val user = currentUser
-                            if (user?.role == UserRole.ADMIN) {
+                            if (user?.role == UserRole.OWNER || user?.role == UserRole.MANAGER) {
                                 viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD)
                             } else {
                                 viewModel.navigateTo(AppScreen.ATTENDANT_DASHBOARD)
@@ -545,6 +550,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
 
                 AppScreen.USERS_MANAGEMENT -> {
                     UserManagementScreen(
+                        currentUserRole = currentUser?.role ?: UserRole.ATTENDANT,
                         allUsers = allUsers,
                         onApproveUser = { userId ->
                             viewModel.approveUser(userId)
@@ -552,12 +558,32 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onRevokeUser = { userId ->
                             viewModel.revokeUser(userId)
                         },
+                        onRestoreUser = { userId ->
+                            viewModel.approveUser(userId)
+                        },
                         onCreateAttendant = { name, email, phone, password ->
                             viewModel.createAttendantByAdmin(name, email, phone, password)
+                        },
+                        onCreateManager = { name, email, phone, password ->
+                            viewModel.createManagerByOwner(name, email, phone, password)
                         },
                         onDeleteUser = { userId ->
                             viewModel.deleteUser(userId)
                         }
+                    )
+                }
+
+                AppScreen.EXPENSES_MANAGEMENT -> {
+                    ExpensesScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
+                    )
+                }
+
+                AppScreen.PROFIT_LOSS_REPORT -> {
+                    ProfitAndLossScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
                     )
                 }
 

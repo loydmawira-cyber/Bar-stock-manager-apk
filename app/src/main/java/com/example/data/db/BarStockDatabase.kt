@@ -30,6 +30,29 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
+import com.example.data.model.Expense
+
+class UserRoleConverter {
+    @TypeConverter
+    fun toUserRole(value: String?): UserRole {
+        if (value == null) return UserRole.ATTENDANT
+        return when (value.uppercase()) {
+            "ADMIN" -> UserRole.OWNER
+            "OWNER" -> UserRole.OWNER
+            "MANAGER" -> UserRole.MANAGER
+            "ATTENDANT" -> UserRole.ATTENDANT
+            else -> UserRole.ATTENDANT
+        }
+    }
+
+    @TypeConverter
+    fun fromUserRole(role: UserRole?): String {
+        return (role ?: UserRole.ATTENDANT).name
+    }
+}
+
 @Database(
     entities = [
         BarProfile::class,
@@ -45,11 +68,13 @@ import kotlinx.coroutines.launch
         Reconciliation::class,
         AppNotification::class,
         StoreStock::class,
-        PurchaseReceipt::class
+        PurchaseReceipt::class,
+        Expense::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
+@TypeConverters(UserRoleConverter::class)
 abstract class BarStockDatabase : RoomDatabase() {
     abstract fun barStockDao(): BarStockDao
 
