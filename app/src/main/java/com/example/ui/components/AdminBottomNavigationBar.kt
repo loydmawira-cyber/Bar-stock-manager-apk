@@ -3,9 +3,9 @@ package com.example.ui.components
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
@@ -54,8 +54,8 @@ fun AdminBottomNavigationBar(
             testTag = "admin_tab_overview"
         ),
         AdminTabItem(
-            screen = AppScreen.COUNTERS_MANAGEMENT,
-            label = "Counters",
+            screen = AppScreen.STORE_INVENTORY,
+            label = "Inventory",
             icon = Icons.Filled.Store,
             testTag = "admin_tab_counters"
         ),
@@ -69,9 +69,9 @@ fun AdminBottomNavigationBar(
         ),
         AdminTabItem(
             screen = AppScreen.LEDGER,
-            label = "Sales",
-            icon = Icons.Filled.AttachMoney,
-            testTag = "admin_tab_sales"
+            label = "Receipts",
+            icon = Icons.Filled.ReceiptLong,
+            testTag = "admin_tab_receipts"
         ),
         AdminTabItem(
             screen = AppScreen.DISPUTES,
