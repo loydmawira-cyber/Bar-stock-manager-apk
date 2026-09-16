@@ -56,7 +56,7 @@ import com.example.ui.screens.ShiftEndClosingScreen
 import com.example.ui.screens.ShiftStartVerificationScreen
 import com.example.ui.screens.ShiftSummaryScreen
 import com.example.ui.screens.StoreInventoryScreen
-import com.example.ui.screens.PurchaseReceiptsScreen
+import com.example.ui.screens.ReceiptsScreen
 import com.example.ui.screens.UserManagementScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AppScreen
@@ -438,7 +438,16 @@ fun BarStockApp(viewModel: BarStockViewModel) {
 
                 AppScreen.LEDGER -> {
                     currentUser?.let { user ->
-                        PurchaseReceiptsScreen(receipts = purchaseReceipts)
+                        ReceiptsScreen(
+                            currentUser = user,
+                            reconciliations = allReconciliations,
+                            attendants = attendants,
+                            selectedAttendantId = selectedAttendantFilterId,
+                            purchaseReceipts = purchaseReceipts,
+                            counters = allCounters,
+                            onViewShiftReceipt = { shiftId -> viewModel.viewShiftReceiptById(shiftId) },
+                            onSelectAttendantFilter = { id -> viewModel.setAttendantLedgerFilter(id) }
+                        )
                     }
                 }
 
