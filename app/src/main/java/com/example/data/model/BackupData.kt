@@ -9,6 +9,8 @@ data class BackupData(
     val items: List<Item> = emptyList(),
     val counters: List<Counter> = emptyList(),
     val counterStocks: List<CounterStock> = emptyList(),
+    val storeStocks: List<StoreStock> = emptyList(),
+    val purchaseReceipts: List<PurchaseReceipt> = emptyList(),
     val shifts: List<Shift> = emptyList(),
     val stockVerifications: List<StockVerification> = emptyList(),
     val shiftClosings: List<ShiftClosing> = emptyList(),
