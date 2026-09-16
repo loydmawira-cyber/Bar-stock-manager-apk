@@ -92,7 +92,8 @@ fun CounterManagementScreen(
     onUpdateCounter: (counterId: Long, name: String, location: String) -> Unit = { _, _, _ -> },
     onDeleteCounter: (counterId: Long) -> Unit = {},
     onAssignItemToCounter: (counterId: Long, itemId: Long, initialQty: Int) -> Unit,
-    onRestockClick: (Counter) -> Unit
+    onRestockClick: (Counter) -> Unit,
+    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _ -> }
 ) {
     var showCreateCounterDialog by remember { mutableStateOf(false) }
     var showAssignItemDialog by remember { mutableStateOf(false) }
@@ -110,6 +111,11 @@ fun CounterManagementScreen(
     var selectedItemForAssign by remember { mutableStateOf<Item?>(null) }
     var assignInitialQtyText by remember { mutableStateOf("24") }
     var expandedItemMenu by remember { mutableStateOf(false) }
+    var restockSource by remember { mutableStateOf("STORE") }
+    var expandedRestockSource by remember { mutableStateOf(false) }
+    var restockSupplier by remember { mutableStateOf("") }
+    var restockReceiptNumber by remember { mutableStateOf("") }
+    var restockUnitCost by remember { mutableStateOf("0") }
 
     val activeCounter = counters.firstOrNull { it.id == selectedCounterId } ?: counters.firstOrNull()
 
@@ -617,6 +623,30 @@ fun CounterManagementScreen(
                         }
                     }
 
+                    ExposedDropdownMenuBox(
+                        expanded = expandedRestockSource,
+                        onExpandedChange = { expandedRestockSource = it }
+                    ) {
+                        OutlinedTextField(
+                            value = if (restockSource == "STORE") "From Store" else "Direct from Supplier",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Restock Source") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRestockSource) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(expanded = expandedRestockSource, onDismissRequest = { expandedRestockSource = false }) {
+                            DropdownMenuItem(text = { Text("From Store") }, onClick = { restockSource = "STORE"; expandedRestockSource = false })
+                            DropdownMenuItem(text = { Text("Direct from Supplier") }, onClick = { restockSource = "SUPPLIER"; expandedRestockSource = false })
+                        }
+                    }
+
+                    if (restockSource == "SUPPLIER") {
+                        OutlinedTextField(restockSupplier, { restockSupplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(restockReceiptNumber, { restockReceiptNumber = it }, label = { Text("Receipt / Invoice Number") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                        OutlinedTextField(restockUnitCost, { restockUnitCost = it }, label = { Text("Cost per unit") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    }
+
                     // Visual breakdown of Existing + Added = Adjusted Total
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -668,7 +698,16 @@ fun CounterManagementScreen(
                         val item = selectedItemForAssign
                         val qty = assignInitialQtyText.toIntOrNull() ?: 0
                         if (item != null && qty > 0) {
-                            onAssignItemToCounter(activeCounter.id, item.id, qty)
+                            onRestockCounterFromSource(
+                                activeCounter.id,
+                                item.id,
+                                qty,
+                                restockSource,
+                                restockSupplier,
+                                restockReceiptNumber,
+                                restockUnitCost.toDoubleOrNull() ?: 0.0,
+                                "Inventory counter restock"
+                            )
                             showAssignItemDialog = false
                             assignInitialQtyText = ""
                         }
