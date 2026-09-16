@@ -19,6 +19,9 @@ import com.example.data.model.ShiftClosing
 import com.example.data.model.ShiftStatus
 import com.example.data.model.StockAdjustment
 import com.example.data.model.StockVerification
+import com.example.data.model.StoreStock
+import com.example.data.model.StoreStockWithItem
+import com.example.data.model.PurchaseReceipt
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
@@ -467,6 +470,53 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     fun getCounterStocksWithItems(counterId: Long): Flow<List<CounterStockWithItem>> =
         dao.getCounterStocksWithItems(counterId)
+
+    fun getStoreStockWithItems(): Flow<List<StoreStockWithItem>> = dao.getAllStoreStockWithItems()
+    val allPurchaseReceipts: Flow<List<PurchaseReceipt>> = dao.getAllPurchaseReceipts()
+
+    suspend fun receivePurchaseToStore(
+        itemId: Long,
+        purchaseQuantity: Int,
+        unitsPerPurchaseUnit: Int,
+        purchaseUnitType: String,
+        supplierName: String,
+        receiptNumber: String,
+        unitCost: Double,
+        receivedByUserId: Long?,
+        receivedByName: String,
+        notes: String = ""
+    ) {
+        require(purchaseQuantity > 0) { "Purchase quantity must be greater than zero." }
+        require(unitsPerPurchaseUnit > 0) { "Units per purchase unit must be greater than zero." }
+        val item = dao.getItemById(itemId) ?: error("Item not found")
+        val unitsReceived = purchaseQuantity * unitsPerPurchaseUnit
+        val existing = dao.getStoreStock(itemId)
+        dao.insertStoreStock(
+            StoreStock(
+                id = existing?.id ?: 0L,
+                itemId = itemId,
+                currentQuantity = (existing?.currentQuantity ?: 0) + unitsReceived,
+                minThreshold = existing?.minThreshold ?: 0
+            )
+        )
+        dao.insertPurchaseReceipt(
+            PurchaseReceipt(
+                receiptNumber = receiptNumber,
+                supplierName = supplierName,
+                itemId = itemId,
+                itemName = item.name,
+                purchaseQuantity = purchaseQuantity,
+                purchaseUnitType = purchaseUnitType,
+                unitsReceived = unitsReceived,
+                stockUnitType = item.unitType,
+                unitCost = unitCost,
+                totalCost = unitCost * purchaseQuantity,
+                receivedByUserId = receivedByUserId,
+                receivedByName = receivedByName,
+                notes = notes
+            )
+        )
+    }
 
     suspend fun setCounterItemStock(
         counterId: Long,

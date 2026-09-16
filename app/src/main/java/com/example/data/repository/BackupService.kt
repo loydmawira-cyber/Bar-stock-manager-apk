@@ -50,6 +50,8 @@ class BackupService(private val dao: BarStockDao) {
             items = dao.getAllItemsSync(),
             counters = dao.getAllCountersSync(),
             counterStocks = dao.getAllCounterStocksSync(),
+            storeStocks = dao.getAllStoreStocksSync(),
+            purchaseReceipts = dao.getAllPurchaseReceiptsSync(),
             shifts = dao.getAllShiftsSync(),
             stockVerifications = dao.getAllStockVerificationsSync(),
             shiftClosings = dao.getAllShiftClosingsSync(),
@@ -73,7 +75,7 @@ class BackupService(private val dao: BarStockDao) {
         val userPhones = activeUsers.mapNotNull { it.phone.takeIf { p -> p.isNotBlank() } }
 
         val docData = mapOf(
-            "schemaVersion" to 2,
+            "schemaVersion" to 3,
             "barId" to targetId,
             "barName" to (snap.barProfile?.barName ?: "Bar"),
             "location" to (snap.barProfile?.location ?: ""),
@@ -208,6 +210,8 @@ class BackupService(private val dao: BarStockDao) {
         dao.clearStockVerifications()
         dao.clearShifts()
         dao.clearCounterStocks()
+        dao.clearStoreStocks()
+        dao.clearPurchaseReceipts()
         dao.clearCounters()
         dao.clearItems()
         dao.clearUsers()
@@ -216,6 +220,8 @@ class BackupService(private val dao: BarStockDao) {
         data.items.forEach { dao.insertItem(it) }
         data.counters.forEach { dao.insertCounter(it) }
         dao.insertCounterStocks(data.counterStocks)
+        data.storeStocks.forEach { dao.insertStoreStock(it) }
+        dao.insertPurchaseReceipts(data.purchaseReceipts)
         data.shifts.forEach { dao.insertShift(it) }
         dao.insertStockVerifications(data.stockVerifications)
         dao.insertShiftClosings(data.shiftClosings)
