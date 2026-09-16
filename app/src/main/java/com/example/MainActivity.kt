@@ -55,6 +55,8 @@ import com.example.ui.screens.NotificationsScreen
 import com.example.ui.screens.ShiftEndClosingScreen
 import com.example.ui.screens.ShiftStartVerificationScreen
 import com.example.ui.screens.ShiftSummaryScreen
+import com.example.ui.screens.StoreInventoryScreen
+import com.example.ui.screens.PurchaseReceiptsScreen
 import com.example.ui.screens.UserManagementScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AppScreen
@@ -75,7 +77,7 @@ class MainActivity : ComponentActivity() {
         database.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer(
             "bar_profile", "users", "items", "counters", "counter_stocks", "shifts", 
             "stock_verifications", "shift_closings", "disputes", 
-            "stock_adjustments", "reconciliations", "app_notifications"
+            "stock_adjustments", "reconciliations", "app_notifications", "store_stocks", "purchase_receipts"
         ) {
             override fun onInvalidated(tables: Set<String>) {
                 syncJob?.cancel()
@@ -117,6 +119,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val allCounters by viewModel.allCounters.collectAsState()
     val allShifts by viewModel.allShifts.collectAsState()
     val allShiftClosings by viewModel.allShiftClosings.collectAsState()
+    val storeStock by viewModel.storeStock.collectAsState()
+    val purchaseReceipts by viewModel.purchaseReceipts.collectAsState()
     val allDisputes by viewModel.allDisputes.collectAsState()
     val allReconciliations by viewModel.allReconciliations.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -163,7 +167,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
         AppScreen.SHIFT_CLOSING -> "Shift Closing"
         AppScreen.SHIFT_SUMMARY -> "Reconciliation Receipt"
         AppScreen.DISPUTES -> "Dispute Center"
-        AppScreen.LEDGER -> "Sales & Settlements"
+        AppScreen.LEDGER -> "Receipts"
+        AppScreen.STORE_INVENTORY -> "Store Inventory"
         AppScreen.COUNTERS_MANAGEMENT -> "Selling Counters"
         AppScreen.ITEMS_MANAGEMENT -> "Stock Prices"
         AppScreen.USERS_MANAGEMENT -> "Attendant Logins"
@@ -433,19 +438,19 @@ fun BarStockApp(viewModel: BarStockViewModel) {
 
                 AppScreen.LEDGER -> {
                     currentUser?.let { user ->
-                        LedgerScreen(
-                            currentUser = user,
-                            reconciliations = allReconciliations,
-                            attendants = attendants,
-                            selectedAttendantId = selectedAttendantFilterId,
-                            onViewShiftReceipt = { shiftId ->
-                                viewModel.viewShiftReceiptById(shiftId)
-                            },
-                            onSelectAttendantFilter = { id ->
-                                viewModel.setAttendantLedgerFilter(id)
-                            }
-                        )
+                        PurchaseReceiptsScreen(receipts = purchaseReceipts)
                     }
+                }
+
+                AppScreen.STORE_INVENTORY -> {
+                    StoreInventoryScreen(
+                        items = allItems,
+                        storeStock = storeStock,
+                        onReceivePurchase = { itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes ->
+                            viewModel.receivePurchaseToStore(itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes)
+                        },
+                        onOpenCounterStock = { viewModel.navigateTo(AppScreen.COUNTERS_MANAGEMENT) }
+                    )
                 }
 
                 AppScreen.COUNTERS_MANAGEMENT -> {
