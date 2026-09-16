@@ -499,9 +499,13 @@ class BarStockRepository(private val dao: BarStockDao) {
                 minThreshold = existing?.minThreshold ?: 0
             )
         )
+        val enteredReceiptNumber = receiptNumber.trim()
+        val finalReceiptNumber = enteredReceiptNumber.ifBlank {
+            "AUTO-${System.currentTimeMillis()}"
+        }
         dao.insertPurchaseReceipt(
             PurchaseReceipt(
-                receiptNumber = receiptNumber,
+                receiptNumber = finalReceiptNumber,
                 supplierName = supplierName,
                 itemId = itemId,
                 itemName = item.name,
