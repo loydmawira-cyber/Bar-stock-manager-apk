@@ -55,7 +55,8 @@ enum class AppScreen {
     ITEMS_MANAGEMENT,
     USERS_MANAGEMENT,
     BAR_PROFILE,
-    NOTIFICATIONS
+    NOTIFICATIONS,
+    STORE_INVENTORY
 }
 
 data class OpeningVerificationState(
@@ -140,6 +141,8 @@ class BarStockViewModel(
     val openDisputes = repository.openDisputes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allReconciliations = repository.allReconciliations.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allStockAdjustments = repository.allStockAdjustments.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val storeStock = repository.getStoreStockWithItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val purchaseReceipts = repository.allPurchaseReceipts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Notifications
     val notifications: StateFlow<List<AppNotification>> = _currentUser.flatMapLatest { user ->
@@ -215,6 +218,39 @@ class BarStockViewModel(
 
     fun navigateTo(screen: AppScreen) {
         _currentScreen.value = screen
+    }
+
+    fun receivePurchaseToStore(
+        itemId: Long,
+        purchaseQuantity: Int,
+        unitsPerPurchaseUnit: Int,
+        purchaseUnitType: String,
+        supplierName: String,
+        receiptNumber: String,
+        unitCost: Double,
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            try {
+                val user = _currentUser.value ?: error("Please sign in first")
+                repository.receivePurchaseToStore(
+                    itemId = itemId,
+                    purchaseQuantity = purchaseQuantity,
+                    unitsPerPurchaseUnit = unitsPerPurchaseUnit,
+                    purchaseUnitType = purchaseUnitType,
+                    supplierName = supplierName,
+                    receiptNumber = receiptNumber,
+                    unitCost = unitCost,
+                    receivedByUserId = user.id,
+                    receivedByName = user.name,
+                    notes = notes
+                )
+                backupService.backupData()
+                _toastMessage.emit("Purchase receipt recorded and store stock updated.")
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Could not record purchase receipt.")
+            }
+        }
     }
 
     fun loginUser(user: User) {
