@@ -18,6 +18,9 @@ import com.example.data.model.ShiftClosing
 import com.example.data.model.ShiftStatus
 import com.example.data.model.StockAdjustment
 import com.example.data.model.StockVerification
+import com.example.data.model.StoreStock
+import com.example.data.model.StoreStockWithItem
+import com.example.data.model.PurchaseReceipt
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
@@ -158,6 +161,44 @@ interface BarStockDao {
 
     @Query("DELETE FROM counter_stocks WHERE counterId = :counterId AND itemId = :itemId")
     suspend fun deleteCounterStock(counterId: Long, itemId: Long)
+
+    // --- Store Stock ---
+    @Query("""
+        SELECT ss.id AS stockId, ss.itemId, i.name AS itemName,
+               i.category, i.unitType, ss.currentQuantity, ss.minThreshold
+        FROM store_stocks ss
+        INNER JOIN items i ON ss.itemId = i.id
+        ORDER BY i.category ASC, i.name ASC
+    """)
+    fun getAllStoreStockWithItems(): Flow<List<StoreStockWithItem>>
+
+    @Query("SELECT * FROM store_stocks WHERE itemId = :itemId LIMIT 1")
+    suspend fun getStoreStock(itemId: Long): StoreStock?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStoreStock(stock: StoreStock): Long
+
+    @Query("SELECT * FROM store_stocks")
+    suspend fun getAllStoreStocksSync(): List<StoreStock>
+
+    @Query("DELETE FROM store_stocks")
+    suspend fun clearStoreStocks()
+
+    // --- Generated Purchase Receipts ---
+    @Query("SELECT * FROM purchase_receipts ORDER BY purchaseDate DESC, id DESC")
+    fun getAllPurchaseReceipts(): Flow<List<PurchaseReceipt>>
+
+    @Query("SELECT * FROM purchase_receipts")
+    suspend fun getAllPurchaseReceiptsSync(): List<PurchaseReceipt>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPurchaseReceipt(receipt: PurchaseReceipt): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPurchaseReceipts(receipts: List<PurchaseReceipt>)
+
+    @Query("DELETE FROM purchase_receipts")
+    suspend fun clearPurchaseReceipts()
 
     // --- Shifts ---
     @Query("SELECT * FROM shifts ORDER BY startTime DESC")
