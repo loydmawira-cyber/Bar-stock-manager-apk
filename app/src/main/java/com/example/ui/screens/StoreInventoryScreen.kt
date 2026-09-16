@@ -114,9 +114,10 @@ private fun ReceivePurchaseDialog(
     onConfirm: (Long, Int, Int, String, String, String, Double, String) -> Unit
 ) {
     var selectedItem by remember { mutableStateOf(items.firstOrNull()) }
-    var expanded by remember { mutableStateOf(false) }
+    var itemMenuExpanded by remember { mutableStateOf(false) }
+    var purchaseUnitMenuExpanded by remember { mutableStateOf(false) }
     var quantity by remember { mutableStateOf("1") }
-    var unitsPerPack by remember { mutableStateOf("1") }
+    var unitsPerPack by remember { mutableStateOf("24") }
     var purchaseUnit by remember { mutableStateOf("Crate") }
     var supplier by remember { mutableStateOf("") }
     var receipt by remember { mutableStateOf("") }
@@ -128,13 +129,36 @@ private fun ReceivePurchaseDialog(
         title = { Text("Receive Purchase into Store", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) { Text(selectedItem?.name ?: "Select item") }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    items.forEach { item -> DropdownMenuItem(text = { Text(item.name) }, onClick = { selectedItem = item; expanded = false }) }
+                OutlinedButton(onClick = { itemMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text(selectedItem?.name ?: "Select item") }
+                DropdownMenu(expanded = itemMenuExpanded, onDismissRequest = { itemMenuExpanded = false }) {
+                    items.forEach { item -> DropdownMenuItem(text = { Text(item.name) }, onClick = { selectedItem = item; itemMenuExpanded = false }) }
+                }
+                OutlinedButton(
+                    onClick = { purchaseUnitMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Purchase unit: $purchaseUnit") }
+                DropdownMenu(
+                    expanded = purchaseUnitMenuExpanded,
+                    onDismissRequest = { purchaseUnitMenuExpanded = false }
+                ) {
+                    listOf("Crate", "Case", "Bottle", "Other").forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option) },
+                            onClick = {
+                                purchaseUnit = option
+                                unitsPerPack = when (option) {
+                                    "Crate" -> "24"
+                                    "Case" -> "6"
+                                    "Bottle" -> "1"
+                                    else -> "1"
+                                }
+                                purchaseUnitMenuExpanded = false
+                            }
+                        )
+                    }
                 }
                 OutlinedTextField(quantity, { quantity = it }, label = { Text("Quantity purchased") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(unitsPerPack, { unitsPerPack = it }, label = { Text("Selling units per $purchaseUnit") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(purchaseUnit, { purchaseUnit = it }, label = { Text("Purchase unit (crate/case/bottle)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(unitsPerPack, { unitsPerPack = it }, label = { Text("Units per $purchaseUnit") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(supplier, { supplier = it }, label = { Text("Supplier") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(receipt, { receipt = it }, label = { Text("Receipt / invoice number") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(cost, { cost = it }, label = { Text("Cost per purchase unit") }, modifier = Modifier.fillMaxWidth())
