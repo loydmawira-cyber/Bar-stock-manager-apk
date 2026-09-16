@@ -21,6 +21,8 @@ import com.example.data.model.ShiftClosing
 import com.example.data.model.ShiftStatus
 import com.example.data.model.StockAdjustment
 import com.example.data.model.StockVerification
+import com.example.data.model.StoreStock
+import com.example.data.model.PurchaseReceipt
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
@@ -41,9 +43,11 @@ import kotlinx.coroutines.launch
         Dispute::class,
         StockAdjustment::class,
         Reconciliation::class,
-        AppNotification::class
+        AppNotification::class,
+        StoreStock::class,
+        PurchaseReceipt::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class BarStockDatabase : RoomDatabase() {
@@ -103,6 +107,8 @@ abstract class BarStockDatabase : RoomDatabase() {
             dao.clearStockVerifications()
             dao.clearShifts()
             dao.clearCounterStocks()
+            dao.clearStoreStocks()
+            dao.clearPurchaseReceipts()
             dao.clearCounters()
             dao.clearItems()
             dao.clearUsers()
