@@ -921,6 +921,31 @@ class BarStockViewModel(
         }
     }
 
+    fun restockCounterFromSource(
+        counterId: Long,
+        itemId: Long,
+        qty: Int,
+        source: String,
+        supplierName: String,
+        receiptNumber: String,
+        unitCost: Double,
+        reason: String
+    ) {
+        val admin = _currentUser.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.restockCounterFromSource(
+                    counterId, itemId, qty, source, supplierName, receiptNumber,
+                    unitCost, admin.name, reason
+                )
+                autoBackup()
+                _toastMessage.emit("Counter restock recorded from ${if (source == "STORE") "Store" else "Direct Supplier"}.")
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Could not record counter restock.")
+            }
+        }
+    }
+
     // --- Admin Counter & Stock Management ---
     fun setSelectedCounterForManagement(counterId: Long) {
         _selectedCounterId.value = counterId
