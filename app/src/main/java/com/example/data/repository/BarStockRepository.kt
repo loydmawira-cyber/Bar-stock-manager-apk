@@ -778,6 +778,45 @@ class BarStockRepository(private val dao: BarStockDao) {
         return id
     }
 
+    suspend fun restockCounterFromSource(
+        counterId: Long,
+        itemId: Long,
+        quantity: Int,
+        source: String,
+        supplierName: String,
+        receiptNumber: String,
+        unitCost: Double,
+        adminName: String,
+        reason: String
+    ) {
+        require(quantity > 0) { "Restock quantity must be greater than zero." }
+        val counter = dao.getCounterById(counterId) ?: error("Counter not found")
+        val item = dao.getItemById(itemId) ?: error("Item not found")
+        if (source == "STORE") {
+            val store = dao.getStoreStock(itemId) ?: error("No store stock available for ${item.name}.")
+            require(store.currentQuantity >= quantity) { "Store stock is only ${store.currentQuantity} ${item.unitType}s." }
+            dao.insertStoreStock(store.copy(currentQuantity = store.currentQuantity - quantity))
+        }
+        addMidShiftAdjustment(counterId, itemId, quantity, adminName, "$source: ${reason.ifBlank { "Restock" }}")
+        dao.insertPurchaseReceipt(
+            PurchaseReceipt(
+                receiptNumber = receiptNumber.trim().ifBlank { "AUTO-${System.currentTimeMillis()}" },
+                supplierName = if (source == "STORE") "Store Transfer" else supplierName,
+                itemId = itemId,
+                itemName = item.name,
+                purchaseQuantity = quantity,
+                purchaseUnitType = item.unitType,
+                unitsReceived = quantity,
+                stockUnitType = item.unitType,
+                unitCost = unitCost,
+                totalCost = unitCost * quantity,
+                destination = counter.name,
+                receivedByName = adminName,
+                notes = "Movement: $source. ${reason.trim()}"
+            )
+        )
+    }
+
     suspend fun respondToAdjustment(adjustmentId: Long, isConfirmed: Boolean, attendantId: Long) {
         val adjustments = dao.getAllStockAdjustments()
         // We'll update via query / direct find
