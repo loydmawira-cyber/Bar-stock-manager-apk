@@ -43,6 +43,7 @@ import com.example.ui.components.BarAppTopBar
 import com.example.ui.components.ChangePasswordDialog
 import com.example.ui.screens.ActiveShiftScreen
 import com.example.ui.screens.AdminDashboardScreen
+import com.example.ui.screens.AdminInventoryScreen
 import com.example.ui.screens.AttendantDashboardScreen
 import com.example.ui.screens.AttendantDashboardTab
 import com.example.ui.screens.AuthScreen
@@ -455,13 +456,34 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 }
 
                 AppScreen.STORE_INVENTORY -> {
-                    StoreInventoryScreen(
-                        items = allItems,
-                        storeStock = storeStock,
-                        onReceivePurchase = { itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes ->
-                            viewModel.receivePurchaseToStore(itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes)
+                    AdminInventoryScreen(
+                        counters = allCounters,
+                        onSelectCounter = { viewModel.setSelectedCounterForManagement(it) },
+                        countersContent = {
+                            CounterManagementScreen(
+                                currentUser = currentUser,
+                                counters = allCounters,
+                                allItems = allItems,
+                                selectedCounterId = selectedCounterId,
+                                counterStocks = selectedCounterStocks,
+                                onSelectCounter = { viewModel.setSelectedCounterForManagement(it) },
+                                onCreateCounter = { name, location -> viewModel.createCounter(name, location) },
+                                onUpdateCounter = { id, name, location -> viewModel.updateCounter(id, name, location) },
+                                onDeleteCounter = { viewModel.deleteCounter(it) },
+                                onAssignItemToCounter = { id, itemId, qty -> viewModel.assignItemToCounter(id, itemId, qty) },
+                                onRestockClick = { viewModel.setSelectedCounterForManagement(it.id) },
+                                onRestockCounterFromSource = { id, itemId, qty, source, supplier, receipt, cost, reason -> viewModel.restockCounterFromSource(id, itemId, qty, source, supplier, receipt, cost, reason) }
+                            )
                         },
-                        onOpenCounterStock = { viewModel.navigateTo(AppScreen.COUNTERS_MANAGEMENT) }
+                        storeContent = {
+                            StoreInventoryScreen(
+                                items = allItems,
+                                storeStock = storeStock,
+                                onReceivePurchase = { itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes ->
+                                    viewModel.receivePurchaseToStore(itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes)
+                                }
+                            )
+                        }
                     )
                 }
 
@@ -489,6 +511,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         },
                         onRestockClick = { counter ->
                             viewModel.setSelectedCounterForManagement(counter.id)
+                        },
+                        onRestockCounterFromSource = { counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason ->
+                            viewModel.restockCounterFromSource(counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason)
                         }
                     )
                 }
