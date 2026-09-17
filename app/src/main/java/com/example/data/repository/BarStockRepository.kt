@@ -1050,7 +1050,10 @@ class BarStockRepository(private val dao: BarStockDao) {
         val closingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
         val volumeSoldMl: Int = maxOf(0, openingVolumeMl - closingVolumeMl)
         val expectedAmount: Double = if (totEnabled && bottleVolumeMl > 0) {
-            (volumeSoldMl / bottleVolumeMl) * unitPrice + if (totSizeMl > 0) ((volumeSoldMl % bottleVolumeMl) / totSizeMl) * totPrice else 0.0
+            val fullBottlesSold = volumeSoldMl / bottleVolumeMl
+            val looseMlSold = volumeSoldMl % bottleVolumeMl
+            val totsSold = if (totSizeMl > 0) looseMlSold / totSizeMl else 0
+            fullBottlesSold.toDouble() * unitPrice + totsSold.toDouble() * totPrice
         } else unitsSold * unitPrice
     }
 
