@@ -1125,6 +1125,8 @@ class BarStockViewModel(
         counterId: Long,
         itemId: Long,
         qty: Int,
+        unitsPerPurchaseUnit: Int,
+        purchaseUnitType: String,
         source: String,
         supplierName: String,
         receiptNumber: String,
@@ -1135,7 +1137,7 @@ class BarStockViewModel(
         viewModelScope.launch {
             try {
                 repository.restockCounterFromSource(
-                    counterId, itemId, qty, source, supplierName, receiptNumber,
+                    counterId, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplierName, receiptNumber,
                     unitCost, admin.name, reason
                 )
                 autoBackup()
