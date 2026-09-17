@@ -132,7 +132,7 @@ interface BarStockDao {
     
     @Query("""
         SELECT cs.id AS stockId, cs.counterId, cs.itemId, i.name AS itemName, 
-               i.category, i.unitPrice, i.casePrice, i.unitType, cs.currentQuantity, cs.minThreshold 
+               i.category, i.unitPrice, i.casePrice, i.unitType, cs.currentQuantity, cs.looseMl, cs.minThreshold 
         FROM counter_stocks cs 
         INNER JOIN items i ON cs.itemId = i.id 
         WHERE cs.counterId = :counterId 
@@ -142,7 +142,7 @@ interface BarStockDao {
 
     @Query("""
         SELECT cs.id AS stockId, cs.counterId, cs.itemId, i.name AS itemName, 
-               i.category, i.unitPrice, i.casePrice, i.unitType, cs.currentQuantity, cs.minThreshold 
+               i.category, i.unitPrice, i.casePrice, i.unitType, cs.currentQuantity, cs.looseMl, cs.minThreshold 
         FROM counter_stocks cs 
         INNER JOIN items i ON cs.itemId = i.id 
         WHERE cs.counterId = :counterId 
@@ -159,8 +159,8 @@ interface BarStockDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCounterStocks(stocks: List<CounterStock>)
 
-    @Query("UPDATE counter_stocks SET currentQuantity = :newQuantity WHERE counterId = :counterId AND itemId = :itemId")
-    suspend fun updateStockQuantity(counterId: Long, itemId: Long, newQuantity: Int)
+    @Query("UPDATE counter_stocks SET currentQuantity = :newQuantity, looseMl = :looseMl WHERE counterId = :counterId AND itemId = :itemId")
+    suspend fun updateStockQuantity(counterId: Long, itemId: Long, newQuantity: Int, looseMl: Int = 0)
 
     @Query("DELETE FROM counter_stocks WHERE counterId = :counterId AND itemId = :itemId")
     suspend fun deleteCounterStock(counterId: Long, itemId: Long)
