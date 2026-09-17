@@ -13,6 +13,7 @@ import com.example.data.model.CounterStock
 import com.example.data.model.Dispute
 import com.example.data.model.Item
 import com.example.data.model.ItemCategory
+import com.example.data.model.ItemCostSnapshot
 import com.example.data.model.NotificationType
 import com.example.data.model.Reconciliation
 import com.example.data.model.ReconciliationType
@@ -69,9 +70,10 @@ class UserRoleConverter {
         AppNotification::class,
         StoreStock::class,
         PurchaseReceipt::class,
-        Expense::class
+        Expense::class,
+        ItemCostSnapshot::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(UserRoleConverter::class)
@@ -134,6 +136,7 @@ abstract class BarStockDatabase : RoomDatabase() {
             dao.clearCounterStocks()
             dao.clearStoreStocks()
             dao.clearPurchaseReceipts()
+            dao.clearItemCostSnapshots()
             dao.clearCounters()
             dao.clearItems()
             dao.clearUsers()
