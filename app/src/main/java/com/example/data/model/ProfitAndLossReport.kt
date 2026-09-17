@@ -12,7 +12,8 @@ data class ItemProfitability(
     val salesRevenue: Double,
     val cogs: Double,
     val grossProfit: Double,
-    val isLossMaking: Boolean
+    val isLossMaking: Boolean,
+    val costIsEstimated: Boolean = false // true when no purchase receipt backs this cost yet (casePrice guess)
 )
 
 enum class PnlTimeframe {
@@ -38,5 +39,6 @@ data class ProfitAndLossReport(
     val closingStockValue: Double = 0.0,
     val stockVarianceQty: Int = 0,
     val itemProfitabilities: List<ItemProfitability> = emptyList(),
-    val lossMakingItems: List<ItemProfitability> = emptyList()
+    val lossMakingItems: List<ItemProfitability> = emptyList(),
+    val itemsWithEstimatedCost: List<ItemProfitability> = emptyList() // no purchase receipt on file yet
 )
