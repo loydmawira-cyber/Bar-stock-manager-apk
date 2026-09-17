@@ -8,18 +8,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,16 +24,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.AmberPrimary
 import com.example.data.model.Counter
-import com.example.ui.components.requiredLabel
-import com.example.ui.theme.CrimsonRed
 
 @Composable
 fun AdminInventoryScreen(
     counters: List<Counter>,
-    counterStockQuantities: Map<Long, Int> = emptyMap(),
     onSelectCounter: (Long) -> Unit,
-    onUpdateCounter: (counterId: Long, name: String, location: String) -> Unit = { _, _, _ -> },
-    onDeleteCounter: (counterId: Long, destinationCounterId: Long?) -> Unit = { _, _ -> },
     countersContent: @Composable () -> Unit,
     storeContent: @Composable () -> Unit
 ) {
@@ -50,13 +36,6 @@ fun AdminInventoryScreen(
     var selectedLocation by remember(locations) {
         mutableStateOf(locations.firstOrNull()?.first ?: "STORE")
     }
-    var menuExpanded by remember { mutableStateOf(false) }
-    var editingCounter by remember { mutableStateOf<Counter?>(null) }
-    var deletingCounter by remember { mutableStateOf<Counter?>(null) }
-    var deleteDestinationCounterId by remember { mutableStateOf<Long?>(null) }
-    var editName by remember { mutableStateOf("") }
-    var editLocation by remember { mutableStateOf("") }
-    val selectedCounter = counters.firstOrNull { it.id.toString() == selectedLocation }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -74,7 +53,6 @@ fun AdminInventoryScreen(
                         selected = selectedLocation == location.first,
                         onClick = {
                             selectedLocation = location.first
-                            menuExpanded = false
                             if (location.first != "STORE") onSelectCounter(location.first.toLong())
                         },
                         label = {
@@ -95,111 +73,8 @@ fun AdminInventoryScreen(
                     )
                 }
             }
-            if (selectedCounter != null) {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "Manage counter")
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(text = { Text("Edit Counter") }, onClick = {
-                        editName = selectedCounter.name
-                        editLocation = selectedCounter.location
-                        editingCounter = selectedCounter
-                        menuExpanded = false
-                    })
-                    DropdownMenuItem(text = { Text("Delete Counter") }, onClick = {
-                        deletingCounter = selectedCounter
-                        deleteDestinationCounterId = null
-                        menuExpanded = false
-                    })
-                }
-            }
         }
         if (selectedLocation == "STORE") storeContent() else countersContent()
     }
 
-    editingCounter?.let { counter ->
-        val isNameValid = editName.trim().isNotBlank()
-        val isLocValid = editLocation.trim().isNotBlank()
-        val isFormValid = isNameValid && isLocValid
-
-        AlertDialog(
-            onDismissRequest = { editingCounter = null },
-            title = { Text("Edit Counter") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it },
-                        label = requiredLabel("Counter name"),
-                        isError = editName.isNotEmpty() && !isNameValid,
-                        supportingText = if (editName.isNotEmpty() && !isNameValid) { { Text("Name cannot be blank", color = CrimsonRed) } } else null,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = editLocation,
-                        onValueChange = { editLocation = it },
-                        label = requiredLabel("Location"),
-                        isError = editLocation.isNotEmpty() && !isLocValid,
-                        supportingText = if (editLocation.isNotEmpty() && !isLocValid) { { Text("Location cannot be blank", color = CrimsonRed) } } else null,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (isFormValid) {
-                            onUpdateCounter(counter.id, editName.trim(), editLocation.trim())
-                            editingCounter = null
-                        }
-                    },
-                    enabled = isFormValid
-                ) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { editingCounter = null }) { Text("Cancel") } }
-        )
-    }
-
-    deletingCounter?.let { counter ->
-        AlertDialog(
-            onDismissRequest = { deletingCounter = null },
-            title = { Text("Delete ${counter.name}?") },
-            text = {
-                val stockQuantity = counterStockQuantities[counter.id] ?: 0
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (stockQuantity <= 0) {
-                        Text("This counter has zero stock and can be deleted permanently.")
-                    } else {
-                        Text("This counter has $stockQuantity units in stock. Choose where to move the stock before deleting it.")
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChip(
-                                selected = deleteDestinationCounterId == null,
-                                onClick = { deleteDestinationCounterId = null },
-                                label = { Text("Store") },
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary)
-                            )
-                            counters.filter { it.id != counter.id }.forEach { destination ->
-                                FilterChip(
-                                    selected = deleteDestinationCounterId == destination.id,
-                                    onClick = { deleteDestinationCounterId = destination.id },
-                                    label = { Text(destination.name) },
-                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary)
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    onDeleteCounter(counter.id, deleteDestinationCounterId)
-                    deletingCounter = null
-                }) { Text("Delete") }
-            },
-            dismissButton = { TextButton(onClick = { deletingCounter = null }) { Text("Cancel") } }
-        )
-    }
 }
