@@ -39,9 +39,10 @@ import com.example.ui.theme.CrimsonRed
 @Composable
 fun AdminInventoryScreen(
     counters: List<Counter>,
+    counterStockQuantities: Map<Long, Int> = emptyMap(),
     onSelectCounter: (Long) -> Unit,
     onUpdateCounter: (counterId: Long, name: String, location: String) -> Unit = { _, _, _ -> },
-    onDeleteCounter: (counterId: Long) -> Unit = {},
+    onDeleteCounter: (counterId: Long, destinationCounterId: Long?) -> Unit = { _, _ -> },
     countersContent: @Composable () -> Unit,
     storeContent: @Composable () -> Unit
 ) {
@@ -52,6 +53,7 @@ fun AdminInventoryScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var editingCounter by remember { mutableStateOf<Counter?>(null) }
     var deletingCounter by remember { mutableStateOf<Counter?>(null) }
+    var deleteDestinationCounterId by remember { mutableStateOf<Long?>(null) }
     var editName by remember { mutableStateOf("") }
     var editLocation by remember { mutableStateOf("") }
     val selectedCounter = counters.firstOrNull { it.id.toString() == selectedLocation }
@@ -106,6 +108,7 @@ fun AdminInventoryScreen(
                     })
                     DropdownMenuItem(text = { Text("Delete Counter") }, onClick = {
                         deletingCounter = selectedCounter
+                        deleteDestinationCounterId = null
                         menuExpanded = false
                     })
                 }
@@ -161,10 +164,38 @@ fun AdminInventoryScreen(
         AlertDialog(
             onDismissRequest = { deletingCounter = null },
             title = { Text("Delete ${counter.name}?") },
-            text = { Text("This will remove the counter and its stock configuration. This action cannot be undone.") },
+            text = {
+                val stockQuantity = counterStockQuantities[counter.id] ?: 0
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (stockQuantity <= 0) {
+                        Text("This counter has zero stock and can be deleted permanently.")
+                    } else {
+                        Text("This counter has $stockQuantity units in stock. Choose where to move the stock before deleting it.")
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = deleteDestinationCounterId == null,
+                                onClick = { deleteDestinationCounterId = null },
+                                label = { Text("Store") },
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary)
+                            )
+                            counters.filter { it.id != counter.id }.forEach { destination ->
+                                FilterChip(
+                                    selected = deleteDestinationCounterId == destination.id,
+                                    onClick = { deleteDestinationCounterId = destination.id },
+                                    label = { Text(destination.name) },
+                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 Button(onClick = {
-                    onDeleteCounter(counter.id)
+                    onDeleteCounter(counter.id, deleteDestinationCounterId)
                     deletingCounter = null
                 }) { Text("Delete") }
             },
