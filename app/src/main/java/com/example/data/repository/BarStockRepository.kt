@@ -512,6 +512,38 @@ class BarStockRepository(private val dao: BarStockDao) {
     suspend fun updateCounter(counter: Counter) = dao.updateCounter(counter).also {  }
     suspend fun deleteCounter(counterId: Long) = dao.deleteCounter(counterId).also {  }
 
+    val allCounterStocks: Flow<List<CounterStock>> = dao.getAllCounterStocks()
+
+    suspend fun deleteCounterAndMoveStock(counterId: Long, destinationCounterId: Long?) {
+        val stocks = dao.getAllCounterStocksSync().filter { it.counterId == counterId && it.currentQuantity > 0 }
+        stocks.forEach { stock ->
+            if (destinationCounterId == null) {
+                val store = dao.getStoreStock(stock.itemId)
+                dao.insertStoreStock(
+                    StoreStock(
+                        id = store?.id ?: 0L,
+                        itemId = stock.itemId,
+                        currentQuantity = (store?.currentQuantity ?: 0) + stock.currentQuantity,
+                        minThreshold = store?.minThreshold ?: stock.minThreshold
+                    )
+                )
+            } else {
+                val destination = dao.getCounterStock(destinationCounterId, stock.itemId)
+                dao.insertCounterStock(
+                    CounterStock(
+                        id = destination?.id ?: 0L,
+                        counterId = destinationCounterId,
+                        itemId = stock.itemId,
+                        currentQuantity = (destination?.currentQuantity ?: 0) + stock.currentQuantity,
+                        minThreshold = destination?.minThreshold ?: stock.minThreshold
+                    )
+                )
+            }
+            dao.deleteCounterStock(counterId, stock.itemId)
+        }
+        dao.deleteCounter(counterId)
+    }
+
     fun getCounterStocksWithItems(counterId: Long): Flow<List<CounterStockWithItem>> =
         dao.getCounterStocksWithItems(counterId)
 
