@@ -137,7 +137,7 @@ fun AdminDashboardScreen(
     onNavigate: (AppScreen) -> Unit,
     onViewShiftReceipt: (Shift) -> Unit = {},
     onAddStockAdjustment: (counterId: Long, itemId: Long, qty: Int, reason: String) -> Unit,
-    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onSelectCounterForManagement: (Long) -> Unit
 ) {
     var showRestockDialog by remember { mutableStateOf(false) }
@@ -150,6 +150,9 @@ fun AdminDashboardScreen(
     var restockSupplier by remember { mutableStateOf("") }
     var restockReceiptNumber by remember { mutableStateOf("") }
     var restockUnitCost by remember { mutableStateOf("0") }
+    var restockPurchaseUnit by remember { mutableStateOf("Crate") }
+    var restockUnitsPerPurchaseUnit by remember { mutableStateOf("24") }
+    var expandedPurchaseUnit by remember { mutableStateOf(false) }
 
     val activeShiftsCount = counters.count { it.activeAttendantId != null }
     val openDisputesCount = disputes.count { it.status == com.example.data.model.DisputeStatus.OPEN }
@@ -588,7 +591,10 @@ fun AdminDashboardScreen(
         val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForRestock?.id }?.currentQuantity ?: 0
         val qtyVal = restockQtyText.toIntOrNull() ?: 0
         val isQtyValid = qtyVal > 0
-        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && qtyVal <= availableAtStore)
+        val unitsPerPurchaseUnitVal = restockUnitsPerPurchaseUnit.toIntOrNull() ?: 0
+        val isPurchasePackValid = unitsPerPurchaseUnitVal > 0
+        val unitsToAdd = if (restockSource == "SUPPLIER") qtyVal * unitsPerPurchaseUnitVal else qtyVal
+        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && unitsToAdd <= availableAtStore)
 
         val isCounterValid = selectedCounterForRestock != null
         val isItemValid = selectedItemForRestock != null
@@ -598,7 +604,7 @@ fun AdminDashboardScreen(
         val costVal = restockUnitCost.toDoubleOrNull()
         val isCostValid = costVal != null && costVal > 0.0
 
-        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid)
+        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid && isPurchasePackValid)
         val isFormValid = isCounterValid && isItemValid && isQtyValid && isStoreQtyValid && isSupplierFormValid
 
         AlertDialog(
@@ -705,7 +711,7 @@ fun AdminDashboardScreen(
                     OutlinedTextField(
                         value = restockQtyText,
                         onValueChange = { restockQtyText = it },
-                        label = requiredLabel("Quantity Added (+ Units)"),
+                        label = requiredLabel(if (restockSource == "SUPPLIER") "Quantity purchased" else "Quantity Added (+ Units)"),
                         isError = hasQtyError,
                         supportingText = {
                             if (hasNoStoreStock) {
@@ -715,7 +721,7 @@ fun AdminDashboardScreen(
                             } else if (restockQtyText.isNotEmpty() && !isQtyValid) {
                                 Text("Quantity must be greater than 0", color = CrimsonRed)
                             } else {
-                                Text("Adds to existing counter stock (Existing + Added = New Total)")
+                                Text(if (restockSource == "SUPPLIER") "Counter stock added: $qtyVal × $unitsPerPurchaseUnitVal = $unitsToAdd units" else "Adds to existing counter stock (Existing + Added = New Total)")
                             }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -727,6 +733,37 @@ fun AdminDashboardScreen(
                     )
 
                     if (restockSource == "SUPPLIER") {
+                        ExposedDropdownMenuBox(
+                            expanded = expandedPurchaseUnit,
+                            onExpandedChange = { expandedPurchaseUnit = it }
+                        ) {
+                            OutlinedTextField(
+                                value = restockPurchaseUnit,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = requiredLabel("Purchase Unit"),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPurchaseUnit) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                            )
+                            ExposedDropdownMenu(expanded = expandedPurchaseUnit, onDismissRequest = { expandedPurchaseUnit = false }) {
+                                listOf("Crate", "Case", "Bottle", "Other").forEach { option ->
+                                    DropdownMenuItem(text = { Text(option) }, onClick = {
+                                        restockPurchaseUnit = option
+                                        restockUnitsPerPurchaseUnit = when (option) { "Crate" -> "24"; "Case" -> "6"; "Bottle", "Other" -> "1" }
+                                        expandedPurchaseUnit = false
+                                    })
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = restockUnitsPerPurchaseUnit,
+                            onValueChange = { restockUnitsPerPurchaseUnit = it },
+                            label = requiredLabel("Units per $restockPurchaseUnit"),
+                            isError = restockUnitsPerPurchaseUnit.isNotEmpty() && !isPurchasePackValid,
+                            supportingText = if (restockUnitsPerPurchaseUnit.isNotEmpty() && !isPurchasePackValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
                         OutlinedTextField(
                             value = restockSupplier,
                             onValueChange = { restockSupplier = it },
@@ -748,9 +785,9 @@ fun AdminDashboardScreen(
                         OutlinedTextField(
                             value = restockUnitCost,
                             onValueChange = { restockUnitCost = it },
-                            label = requiredLabel("Cost per unit"),
+                            label = requiredLabel("Cost per $restockPurchaseUnit"),
                             isError = restockUnitCost.isNotEmpty() && !isCostValid,
-                            supportingText = if (restockUnitCost.isNotEmpty() && !isCostValid) { { Text("Cost must be > 0", color = CrimsonRed) } } else null,
+                            supportingText = if (restockUnitCost.isNotEmpty() && !isCostValid) { { Text("Cost must be > 0", color = CrimsonRed) } } else { { Text("Enter the purchase price for one $restockPurchaseUnit") } },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -778,6 +815,8 @@ fun AdminDashboardScreen(
                                 counter.id,
                                 item.id,
                                 qtyVal,
+                                if (restockSource == "SUPPLIER") unitsPerPurchaseUnitVal else 1,
+                                if (restockSource == "SUPPLIER") restockPurchaseUnit else item.unitType,
                                 restockSource,
                                 restockSupplier.trim(),
                                 restockReceiptNumber.trim(),
