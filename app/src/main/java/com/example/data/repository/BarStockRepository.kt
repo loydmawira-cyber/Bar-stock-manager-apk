@@ -866,6 +866,8 @@ class BarStockRepository(private val dao: BarStockDao) {
         counterId: Long,
         itemId: Long,
         quantity: Int,
+        unitsPerPurchaseUnit: Int,
+        purchaseUnitType: String,
         source: String,
         supplierName: String,
         receiptNumber: String,
@@ -874,20 +876,22 @@ class BarStockRepository(private val dao: BarStockDao) {
         reason: String
     ) {
         require(quantity > 0) { "Restock quantity must be greater than zero." }
+        require(unitsPerPurchaseUnit > 0) { "Units per purchase unit must be greater than zero." }
         require(source == "STORE" || unitCost > 0.0) { "Supplier restock requires a cost greater than zero." }
         val counter = dao.getCounterById(counterId) ?: error("Counter not found")
         val item = dao.getItemById(itemId) ?: error("Item not found")
+        val unitsReceived = if (source == "SUPPLIER") quantity * unitsPerPurchaseUnit else quantity
         if (source == "STORE") {
             val store = dao.getStoreStock(itemId)
             if (store == null || store.currentQuantity <= 0) {
                 throw IllegalArgumentException("No stock available in Store for this item.")
             }
-            if (quantity > store.currentQuantity) {
+            if (unitsReceived > store.currentQuantity) {
                 throw IllegalArgumentException("Insufficient Store Stock. Available: ${store.currentQuantity}.")
             }
-            dao.insertStoreStock(store.copy(currentQuantity = store.currentQuantity - quantity))
+            dao.insertStoreStock(store.copy(currentQuantity = store.currentQuantity - unitsReceived))
         }
-        addMidShiftAdjustment(counterId, itemId, quantity, adminName, "$source: ${reason.ifBlank { "Restock" }}")
+        addMidShiftAdjustment(counterId, itemId, unitsReceived, adminName, "$source: ${reason.ifBlank { "Restock" }}")
         dao.insertPurchaseReceipt(
             PurchaseReceipt(
                 receiptNumber = receiptNumber.trim().ifBlank { "AUTO-${System.currentTimeMillis()}" },
@@ -895,8 +899,8 @@ class BarStockRepository(private val dao: BarStockDao) {
                 itemId = itemId,
                 itemName = item.name,
                 purchaseQuantity = quantity,
-                purchaseUnitType = item.unitType,
-                unitsReceived = quantity,
+                purchaseUnitType = purchaseUnitType,
+                unitsReceived = unitsReceived,
                 stockUnitType = item.unitType,
                 unitCost = unitCost,
                 totalCost = unitCost * quantity,
