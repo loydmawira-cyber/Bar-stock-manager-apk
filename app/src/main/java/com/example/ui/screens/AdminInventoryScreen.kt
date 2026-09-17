@@ -58,34 +58,40 @@ fun AdminInventoryScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            locations.forEach { location ->
-                FilterChip(
-                    selected = selectedLocation == location.first,
-                    onClick = {
-                        selectedLocation = location.first
-                        menuExpanded = false
-                        if (location.first != "STORE") onSelectCounter(location.first.toLong())
-                    },
-                    label = {
-                        Text(
-                            text = location.second,
-                            fontSize = 14.sp,
-                            fontWeight = if (selectedLocation == location.first) FontWeight.Bold else FontWeight.Medium
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(if (locations.size > 4) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                locations.forEach { location ->
+                    FilterChip(
+                        selected = selectedLocation == location.first,
+                        onClick = {
+                            selectedLocation = location.first
+                            menuExpanded = false
+                            if (location.first != "STORE") onSelectCounter(location.first.toLong())
+                        },
+                        label = {
+                            Text(
+                                text = location.second,
+                                fontSize = 14.sp,
+                                fontWeight = if (selectedLocation == location.first) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        },
+                        modifier = if (locations.size <= 4) Modifier.weight(1f) else Modifier,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AmberPrimary,
+                            selectedLabelColor = Color.Black,
+                            containerColor = Color(0xFF252830),
+                            labelColor = Color.White
                         )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AmberPrimary,
-                        selectedLabelColor = Color.Black,
-                        containerColor = Color(0xFF252830),
-                        labelColor = Color.White
                     )
-                )
+                }
             }
             if (selectedCounter != null) {
                 IconButton(onClick = { menuExpanded = true }) {
