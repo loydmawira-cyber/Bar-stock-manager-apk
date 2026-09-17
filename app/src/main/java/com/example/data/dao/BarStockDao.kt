@@ -200,6 +200,22 @@ interface BarStockDao {
     @Query("DELETE FROM purchase_receipts")
     suspend fun clearPurchaseReceipts()
 
+    // --- Daily Item Cost Snapshots (last-purchase-cost-in-effect, frozen per day) ---
+    @Query("SELECT * FROM item_cost_snapshots WHERE itemId = :itemId AND dayStart <= :dayStart ORDER BY dayStart DESC LIMIT 1")
+    suspend fun getCostSnapshotOnOrBefore(itemId: Long, dayStart: Long): com.example.data.model.ItemCostSnapshot?
+
+    @Query("SELECT MAX(dayStart) FROM item_cost_snapshots WHERE itemId = :itemId")
+    suspend fun getLatestSnapshotDay(itemId: Long): Long?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCostSnapshot(snapshot: com.example.data.model.ItemCostSnapshot)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCostSnapshots(snapshots: List<com.example.data.model.ItemCostSnapshot>)
+
+    @Query("DELETE FROM item_cost_snapshots")
+    suspend fun clearItemCostSnapshots()
+
     // --- Shifts ---
     @Query("SELECT * FROM shifts ORDER BY startTime DESC")
     fun getAllShifts(): Flow<List<Shift>>
