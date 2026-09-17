@@ -45,6 +45,7 @@ fun AdminBottomNavigationBar(
     currentScreen: AppScreen,
     openDisputesCount: Int,
     pendingUsersCount: Int,
+    isOwner: Boolean = true,
     onNavigate: (AppScreen) -> Unit
 ) {
     val tabs = listOf(
@@ -81,14 +82,19 @@ fun AdminBottomNavigationBar(
             badgeCount = openDisputesCount,
             badgeColor = CrimsonRed,
             testTag = "admin_tab_disputes"
-        ),
-        AdminTabItem(
-            screen = AppScreen.PROFIT_LOSS_REPORT,
-            label = "P&L",
-            icon = Icons.Filled.TrendingUp,
-            testTag = "admin_tab_pnl"
         )
-    )
+    ) + if (isOwner) {
+        listOf(
+            AdminTabItem(
+                screen = AppScreen.PROFIT_LOSS_REPORT,
+                label = "P&L",
+                icon = Icons.Filled.TrendingUp,
+                testTag = "admin_tab_pnl"
+            )
+        )
+    } else {
+        emptyList()
+    }
 
     NavigationBar(
         containerColor = DarkSurface,
