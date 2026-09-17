@@ -102,6 +102,7 @@ fun BarProfileScreen(
         customPhotoUri: String?,
         contactPhone: String,
         currencySymbol: String,
+        paymentMethods: String,
         managerName: String,
         openingHours: String
     ) -> Unit,
@@ -114,6 +115,7 @@ fun BarProfileScreen(
     var customPhotoUri by remember(barProfile) { mutableStateOf(barProfile.customPhotoUri ?: "") }
     var contactPhone by remember(barProfile) { mutableStateOf(barProfile.contactPhone) }
     var currencySymbol by remember(barProfile) { mutableStateOf(barProfile.currencySymbol) }
+    var paymentMethods by remember(barProfile) { mutableStateOf(barProfile.paymentMethods) }
     var managerName by remember(barProfile) { mutableStateOf(barProfile.managerName) }
     var openingHours by remember(barProfile) { mutableStateOf(barProfile.openingHours) }
 
@@ -457,6 +459,19 @@ fun BarProfileScreen(
                         )
                     }
 
+                    OutlinedTextField(
+                        value = paymentMethods,
+                        onValueChange = { paymentMethods = it },
+                        label = { Text("Payment methods") },
+                        supportingText = { Text("Comma separated: Cash, M-Pesa, Card") },
+                        modifier = Modifier.fillMaxWidth().testTag("bar_payment_methods_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmberPrimary,
+                            focusedLabelColor = AmberPrimary
+                        )
+                    )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
@@ -513,6 +528,7 @@ fun BarProfileScreen(
                             customPhotoUri.trim().ifBlank { null },
                             contactPhone.trim(),
                             currencySymbol.trim(),
+                            paymentMethods.trim(),
                             managerName.trim(),
                             openingHours.trim()
                         )
