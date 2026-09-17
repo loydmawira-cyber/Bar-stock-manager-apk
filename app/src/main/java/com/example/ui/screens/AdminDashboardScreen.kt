@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -468,21 +471,6 @@ fun AdminDashboardScreen(
                     letterSpacing = 1.sp
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = {
-                            selectedCounterForRestock = counters.firstOrNull()
-                            selectedItemForRestock = items.firstOrNull()
-                            showRestockDialog = true
-                        }
-                    ) {
-                        Text("+ Restock", color = EmeraldGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    TextButton(onClick = { onNavigate(AppScreen.COUNTERS_MANAGEMENT) }) {
-                        Text("Counters", color = AmberPrimary, fontSize = 12.sp)
-                    }
-                }
             }
         }
 
@@ -613,7 +601,12 @@ fun AdminDashboardScreen(
                 Text("Add / Remove Stock (Restock)", fontWeight = FontWeight.Bold)
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 520.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(
                         text = "If the counter has an active attendant, a notification will be pushed to them to confirm the received quantity.",
                         fontSize = 12.sp,
