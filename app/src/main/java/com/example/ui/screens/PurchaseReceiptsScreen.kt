@@ -9,14 +9,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,10 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Counter
+import com.example.data.model.Item
 import com.example.data.model.PurchaseReceipt
 import com.example.ui.components.formatCurrency
 import com.example.ui.components.formatDateTime
@@ -42,9 +50,12 @@ private enum class PurchaseTimeFilter { TODAY, MONTH, YEAR }
 @Composable
 fun PurchaseReceiptsScreen(
     receipts: List<PurchaseReceipt>,
-    counters: List<Counter> = emptyList()
+    counters: List<Counter> = emptyList(),
+    items: List<Item> = emptyList(),
+    onReceivePurchase: ((itemId: Long, purchaseQuantity: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, supplierName: String, receiptNumber: String, unitCost: Double, notes: String) -> Unit)? = null
 ) {
     val now = remember { Calendar.getInstance() }
+    var showReceiveDialog by remember { mutableStateOf(false) }
     var selectedDestination by remember { mutableStateOf("All") }
     var destinationExpanded by remember { mutableStateOf(false) }
     var selectedTimeFilter by remember { mutableStateOf(PurchaseTimeFilter.TODAY) }
@@ -93,8 +104,27 @@ fun PurchaseReceiptsScreen(
     ) {
         item {
             Column {
-                Text("PURCHASE RECEIPTS", color = AmberPrimary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Individual receipts generated from Inventory receiving.", color = Color.LightGray, fontSize = 12.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("PURCHASE RECEIPTS", color = AmberPrimary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("Individual receipts generated from Inventory receiving.", color = Color.LightGray, fontSize = 12.sp)
+                    }
+                    if (onReceivePurchase != null && items.isNotEmpty()) {
+                        Button(
+                            onClick = { showReceiveDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
+                            modifier = Modifier.testTag("add_purchase_receipt_button")
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Receive", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -162,5 +192,16 @@ fun PurchaseReceiptsScreen(
                 }
             }
         }
+    }
+
+    if (showReceiveDialog && onReceivePurchase != null) {
+        ReceivePurchaseDialog(
+            items = items,
+            onDismiss = { showReceiveDialog = false },
+            onConfirm = { itemId, qty, pack, unit, supplier, receipt, cost, notes ->
+                onReceivePurchase(itemId, qty, pack, unit, supplier, receipt, cost, notes)
+                showReceiveDialog = false
+            }
+        )
     }
 }

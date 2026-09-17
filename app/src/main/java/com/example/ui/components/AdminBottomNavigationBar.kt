@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -80,6 +81,12 @@ fun AdminBottomNavigationBar(
             badgeCount = openDisputesCount,
             badgeColor = CrimsonRed,
             testTag = "admin_tab_disputes"
+        ),
+        AdminTabItem(
+            screen = AppScreen.PROFIT_LOSS_REPORT,
+            label = "P&L",
+            icon = Icons.Filled.TrendingUp,
+            testTag = "admin_tab_pnl"
         )
     )
 
@@ -112,22 +119,23 @@ fun AdminBottomNavigationBar(
                             Icon(
                                 imageVector = tab.icon,
                                 contentDescription = tab.label,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     } else {
                         Icon(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 },
                 label = {
                     Text(
                         text = tab.label,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(

@@ -2,17 +2,61 @@ package com.example.data.repository
 
 import com.example.data.dao.BarStockDao
 import com.example.data.model.BackupData
+import com.example.data.model.UserRole
+import com.example.data.model.UserStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.squareup.moshi.FromJson
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.ToJson
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.tasks.await
 import java.security.MessageDigest
 
+class MoshiUserRoleAdapter {
+    @FromJson
+    fun fromJson(value: String): UserRole {
+        return when (value.uppercase()) {
+            "ADMIN" -> UserRole.OWNER
+            "OWNER" -> UserRole.OWNER
+            "MANAGER" -> UserRole.MANAGER
+            "ATTENDANT" -> UserRole.ATTENDANT
+            else -> UserRole.ATTENDANT
+        }
+    }
+
+    @ToJson
+    fun toJson(role: UserRole): String {
+        return role.name
+    }
+}
+
+class MoshiUserStatusAdapter {
+    @FromJson
+    fun fromJson(value: String): UserStatus {
+        return when (value.uppercase()) {
+            "APPROVED" -> UserStatus.APPROVED
+            "REVOKED" -> UserStatus.REVOKED
+            "PENDING" -> UserStatus.PENDING
+            else -> UserStatus.APPROVED
+        }
+    }
+
+    @ToJson
+    fun toJson(status: UserStatus): String {
+        return status.name
+    }
+}
+
 class BackupService(private val dao: BarStockDao) {
     private val firestore by lazy { FirebaseFirestore.getInstance() }
-    private val adapter = Moshi.Builder().add(KotlinJsonAdapterFactory()).build().adapter(BackupData::class.java)
+    private val moshi = Moshi.Builder()
+        .add(MoshiUserRoleAdapter())
+        .add(MoshiUserStatusAdapter())
+        .add(KotlinJsonAdapterFactory())
+        .build()
+    private val adapter = moshi.adapter(BackupData::class.java)
 
     private suspend fun ensureAuth() {
         check(FirebaseAuth.getInstance().currentUser != null) {
@@ -98,6 +142,7 @@ class BackupService(private val dao: BarStockDao) {
 
         // 1. If identity is provided, search Firestore by user email/phone or hash
         if (!cleanIdentity.isNullOrBlank()) {
+            // Check by userEmails array
             try {
                 val emailQuery = firestore.collection("backups")
                     .whereArrayContains("userEmails", cleanIdentity)
@@ -110,6 +155,22 @@ class BackupService(private val dao: BarStockDao) {
                 // continue
             }
 
+            // Check by adminEmail field
+            if (remoteDoc == null || !remoteDoc.exists()) {
+                try {
+                    val adminEmailQuery = firestore.collection("backups")
+                        .whereEqualTo("adminEmail", cleanIdentity)
+                        .get()
+                        .await()
+                    if (!adminEmailQuery.isEmpty) {
+                        remoteDoc = adminEmailQuery.documents.maxByOrNull { it.getLong("updatedAt") ?: 0L }
+                    }
+                } catch (e: Exception) {
+                    // continue
+                }
+            }
+
+            // Check by userPhones array
             if (remoteDoc == null || !remoteDoc.exists()) {
                 try {
                     val phoneQuery = firestore.collection("backups")
@@ -124,6 +185,22 @@ class BackupService(private val dao: BarStockDao) {
                 }
             }
 
+            // Check by adminPhone field
+            if (remoteDoc == null || !remoteDoc.exists()) {
+                try {
+                    val adminPhoneQuery = firestore.collection("backups")
+                        .whereEqualTo("adminPhone", identityOverride!!.trim())
+                        .get()
+                        .await()
+                    if (!adminPhoneQuery.isEmpty) {
+                        remoteDoc = adminPhoneQuery.documents.maxByOrNull { it.getLong("updatedAt") ?: 0L }
+                    }
+                } catch (e: Exception) {
+                    // continue
+                }
+            }
+
+            // Check by hash ID
             if (remoteDoc == null || !remoteDoc.exists()) {
                 try {
                     val docByHash = firestore.collection("backups").document(hashString(cleanIdentity)).get().await()
@@ -218,7 +295,17 @@ class BackupService(private val dao: BarStockDao) {
         dao.clearUsers()
         dao.clearExpenses()
 
-        data.users.forEach { dao.insertUser(it) }
+        data.users.forEach { user ->
+            val migratedUser = if (user.role == UserRole.OWNER || user.role.name == "ADMIN" || user.role.name == "OWNER") {
+                user.copy(
+                    role = UserRole.OWNER,
+                    status = UserStatus.APPROVED
+                )
+            } else {
+                user
+            }
+            dao.insertUser(migratedUser)
+        }
         data.items.forEach { dao.insertItem(it) }
         data.counters.forEach { dao.insertCounter(it) }
         dao.insertCounterStocks(data.counterStocks)

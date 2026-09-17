@@ -123,13 +123,16 @@ class BarStockRepository(private val dao: BarStockDao) {
     val attendants: Flow<List<User>> = dao.getUsersByRole(UserRole.ATTENDANT)
 
     suspend fun getUserById(userId: Long): User? = dao.getUserById(userId)
-    suspend fun getUserByEmail(email: String): User? = dao.getUserByEmail(email)
+    suspend fun getUserByEmail(email: String): User? = dao.getUserByEmail(email.trim())
     suspend fun getUserByIdentifier(identifier: String): User? = dao.getUserByIdentifier(identifier.trim())
+    suspend fun getAllUsersSync(): List<User> = dao.getAllUsersSync()
+    suspend fun updateUser(user: User) = dao.updateUser(user)
 
     suspend fun authenticateUser(identifier: String, password: String): User? {
         val trimmedIdentifier = identifier.trim()
         val trimmedPassword = password.trim()
-        val user = dao.getUserByIdentifier(trimmedIdentifier)
+        var user = dao.getUserByIdentifier(trimmedIdentifier)
+            ?: dao.getAllUsersSync().firstOrNull { it.email.equals(trimmedIdentifier, ignoreCase = true) }
 
         if (user != null) {
             // Block revoked or pending accounts from authenticating
@@ -137,16 +140,24 @@ class BarStockRepository(private val dao: BarStockDao) {
                 return null
             }
 
+            // Ensure ADMIN -> OWNER migration
+            if (user.role == UserRole.OWNER || user.role.name == "ADMIN") {
+                if (user.role != UserRole.OWNER || user.status != UserStatus.APPROVED) {
+                    val migrated = user.copy(role = UserRole.OWNER, status = UserStatus.APPROVED)
+                    dao.updateUser(migrated)
+                    user = migrated
+                }
+            }
+
             // Check local password match
             if (user.password == trimmedPassword) {
-                // Cloud backup requires a real Firebase session; do not fall back to local-only login for email accounts.
                 if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
                     val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
-                    if (!currentFbEmail.equals(user.email, ignoreCase = true)) {
+                    if (!currentFbEmail.equals(user.email.trim(), ignoreCase = true)) {
                         try {
-                            FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                            FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email.trim(), trimmedPassword).await()
                         } catch (e: Exception) {
-                            return null
+                            // Let the ViewModel handle or report Firebase auth if needed
                         }
                     }
                 }
@@ -155,7 +166,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                 // Local password didn't match directly. Try Firebase Auth (in case password was updated elsewhere)
                 try {
                     if (user.email.isNotBlank() && android.util.Patterns.EMAIL_ADDRESS.matcher(user.email).matches()) {
-                        FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email, trimmedPassword).await()
+                        FirebaseAuth.getInstance().signInWithEmailAndPassword(user.email.trim(), trimmedPassword).await()
                         // Firebase sign-in succeeded! Update local password
                         dao.updateUserPassword(user.id, trimmedPassword)
                         return user.copy(password = trimmedPassword)
@@ -164,22 +175,6 @@ class BarStockRepository(private val dao: BarStockDao) {
                     // Firebase sign-in failed
                 }
                 return null
-            }
-        } else {
-            // Authenticate the Firebase account, but do not create a local user yet.
-            // The caller must restore the matching bar backup first; otherwise a
-            // missing local user could incorrectly be created as ADMIN.
-            try {
-                if (android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedIdentifier).matches()) {
-                    val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
-                    if (!currentFbEmail.equals(trimmedIdentifier, ignoreCase = true)) {
-                        FirebaseAuth.getInstance()
-                            .signInWithEmailAndPassword(trimmedIdentifier, trimmedPassword)
-                            .await()
-                    }
-                }
-            } catch (e: Exception) {
-                // Firebase sign-in failed
             }
         }
         return null

@@ -55,13 +55,13 @@ interface BarStockDao {
     @Query("SELECT * FROM users WHERE id = :userId LIMIT 1")
     suspend fun getUserById(userId: Long): User?
 
-    @Query("SELECT * FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1")
+    @Query("SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(:email)) LIMIT 1")
     suspend fun getUserByEmail(email: String): User?
 
-    @Query("SELECT * FROM users WHERE phone = :phone LIMIT 1")
+    @Query("SELECT * FROM users WHERE TRIM(phone) = TRIM(:phone) LIMIT 1")
     suspend fun getUserByPhone(phone: String): User?
 
-    @Query("SELECT * FROM users WHERE (LOWER(email) = LOWER(:identifier) OR phone = :identifier) LIMIT 1")
+    @Query("SELECT * FROM users WHERE (LOWER(TRIM(email)) = LOWER(TRIM(:identifier)) OR TRIM(phone) = TRIM(:identifier)) LIMIT 1")
     suspend fun getUserByIdentifier(identifier: String): User?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -34,11 +34,10 @@ import com.example.ui.theme.EmeraldGreen
 import com.example.ui.viewmodel.BarStockViewModel
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfitAndLossScreen(
     viewModel: BarStockViewModel,
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val selectedTimeframe by viewModel.selectedPnlTimeframe.collectAsState()
@@ -48,29 +47,13 @@ fun ProfitAndLossScreen(
         viewModel.loadProfitAndLossReport(selectedTimeframe)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Profit & Loss Statement", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
+    Column(
         modifier = modifier
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            // Timeframe Selector Tabs
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp)
+    ) {
+        // Timeframe Selector Tabs
             TabRow(
                 selectedTabIndex = selectedTimeframe.ordinal,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -286,7 +269,6 @@ fun ProfitAndLossScreen(
             }
         }
     }
-}
 
 @Composable
 fun ItemProfitabilityCard(item: ItemProfitability) {

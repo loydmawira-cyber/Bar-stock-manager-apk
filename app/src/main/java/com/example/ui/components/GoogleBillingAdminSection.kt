@@ -97,76 +97,37 @@ fun GoogleBillingAdminSection(
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = AmberPrimary.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.size(38.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.CreditCard,
-                                    contentDescription = null,
-                                    tint = AmberPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "LICENSING & SUBSCRIPTION",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AmberPrimary,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "6-Month Free Trial & $10/Yr Premium",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    // Connection Indicator
-                    val statusColor = when (connectionState) {
-                        BillingConnectionState.CONNECTED -> EmeraldGreen
-                        BillingConnectionState.CONNECTING -> AmberPrimary
-                        else -> Color.Gray
-                    }
-                    val statusText = when (connectionState) {
-                        BillingConnectionState.CONNECTED -> "Billing Connected"
-                        BillingConnectionState.CONNECTING -> "Connecting..."
-                        BillingConnectionState.DISCONNECTED -> "Billing Disconnected"
-                        BillingConnectionState.PLAY_STORE_UNAVAILABLE -> "Billing Unavailable"
-                    }
-
                     Surface(
-                        color = statusColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp)
+                        color = AmberPrimary.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.size(38.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(statusColor, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = statusText,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = statusColor
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.CreditCard,
+                                contentDescription = null,
+                                tint = AmberPrimary,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "LICENSING & SUBSCRIPTION",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AmberPrimary,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "6-Month Free Trial & $10/Yr Premium",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
 

@@ -107,7 +107,7 @@ fun StoreInventoryScreen(
 }
 
 @Composable
-private fun ReceivePurchaseDialog(
+fun ReceivePurchaseDialog(
     items: List<Item>,
     onDismiss: () -> Unit,
     onConfirm: (Long, Int, Int, String, String, String, Double, String) -> Unit

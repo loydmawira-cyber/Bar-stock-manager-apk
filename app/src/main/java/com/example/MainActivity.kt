@@ -124,6 +124,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val allShiftClosings by viewModel.allShiftClosings.collectAsState()
     val storeStock by viewModel.storeStock.collectAsState()
     val purchaseReceipts by viewModel.purchaseReceipts.collectAsState()
+    val allExpenses by viewModel.allExpenses.collectAsState()
     val allDisputes by viewModel.allDisputes.collectAsState()
     val allReconciliations by viewModel.allReconciliations.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
@@ -176,7 +177,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
             AppScreen.ITEMS_MANAGEMENT -> "Stock Prices"
             AppScreen.USERS_MANAGEMENT -> if (currentUser?.role == UserRole.OWNER) "User Hierarchy" else "Attendant Logins"
             AppScreen.EXPENSES_MANAGEMENT -> "Expense Management"
-            AppScreen.PROFIT_LOSS_REPORT -> "Profit & Loss Reports"
+            AppScreen.PROFIT_LOSS_REPORT -> "P&L Statement"
             AppScreen.NOTIFICATIONS -> "Notification Center"
         }
 
@@ -455,8 +456,19 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             selectedAttendantId = selectedAttendantFilterId,
                             purchaseReceipts = purchaseReceipts,
                             counters = allCounters,
+                            items = allItems,
+                            expenses = allExpenses,
                             onViewShiftReceipt = { shiftId -> viewModel.viewShiftReceiptById(shiftId) },
-                            onSelectAttendantFilter = { id -> viewModel.setAttendantLedgerFilter(id) }
+                            onSelectAttendantFilter = { id -> viewModel.setAttendantLedgerFilter(id) },
+                            onAddExpense = { category, description, amount, paymentMethod, referenceNumber, notes ->
+                                viewModel.addExpense(category, description, amount, paymentMethod, referenceNumber, notes)
+                            },
+                            onDeleteExpense = { id ->
+                                viewModel.deleteExpense(id)
+                            },
+                            onReceivePurchase = { itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes ->
+                                viewModel.receivePurchaseToStore(itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes)
+                            }
                         )
                     }
                 }

@@ -397,67 +397,158 @@ class BarStockViewModel(
         }
     }
 
+    private fun extractFirebaseErrorCode(e: Throwable): String {
+        return when (e) {
+            is com.google.firebase.auth.FirebaseAuthException -> e.errorCode
+            is com.google.firebase.FirebaseNetworkException -> "auth/network-request-failed"
+            else -> {
+                val msg = e.message ?: ""
+                when {
+                    msg.contains("invalid-credential", ignoreCase = true) || msg.contains("ERROR_INVALID_CREDENTIAL", ignoreCase = true) -> "auth/invalid-credential"
+                    msg.contains("user-not-found", ignoreCase = true) || msg.contains("ERROR_USER_NOT_FOUND", ignoreCase = true) -> "auth/user-not-found"
+                    msg.contains("wrong-password", ignoreCase = true) || msg.contains("ERROR_WRONG_PASSWORD", ignoreCase = true) -> "auth/wrong-password"
+                    msg.contains("user-disabled", ignoreCase = true) || msg.contains("ERROR_USER_DISABLED", ignoreCase = true) -> "auth/user-disabled"
+                    msg.contains("invalid-email", ignoreCase = true) || msg.contains("ERROR_INVALID_EMAIL", ignoreCase = true) -> "auth/invalid-email"
+                    msg.contains("network", ignoreCase = true) -> "auth/network-request-failed"
+                    msg.contains("too-many-requests", ignoreCase = true) || msg.contains("ERROR_TOO_MANY_REQUESTS", ignoreCase = true) -> "auth/too-many-requests"
+                    msg.contains("api-key-not-valid", ignoreCase = true) -> "auth/api-key-not-valid"
+                    else -> "auth/unknown"
+                }
+            }
+        }
+    }
+
+    private fun formatFirebaseAuthError(e: Throwable): String {
+        val code = extractFirebaseErrorCode(e)
+        val friendly = when {
+            e is com.google.firebase.FirebaseNetworkException || code.contains("network", ignoreCase = true) ->
+                "Network error. Please check your internet connection."
+            code.contains("wrong-password", ignoreCase = true) || code.equals("ERROR_WRONG_PASSWORD", ignoreCase = true) ->
+                "Wrong password. Please verify your password."
+            code.contains("user-not-found", ignoreCase = true) || code.equals("ERROR_USER_NOT_FOUND", ignoreCase = true) ->
+                "User not found. No account registered with this email or phone."
+            code.contains("user-disabled", ignoreCase = true) || code.equals("ERROR_USER_DISABLED", ignoreCase = true) ->
+                "Account disabled. Please contact support or management."
+            code.contains("invalid-email", ignoreCase = true) || code.equals("ERROR_INVALID_EMAIL", ignoreCase = true) ->
+                "Invalid email address format."
+            code.contains("invalid-credential", ignoreCase = true) || code.equals("ERROR_INVALID_CREDENTIAL", ignoreCase = true) ->
+                "Invalid credentials (wrong password or unverified account)."
+            code.contains("too-many-requests", ignoreCase = true) || code.equals("ERROR_TOO_MANY_REQUESTS", ignoreCase = true) ->
+                "Too many failed attempts. Please try again in a few minutes."
+            code.contains("api-key", ignoreCase = true) || code.contains("config", ignoreCase = true) ->
+                "Firebase configuration error. Please verify project settings."
+            else ->
+                e.localizedMessage ?: "Authentication failed."
+        }
+        return "$friendly [$code]"
+    }
+
     fun loginWithCredentials(identifier: String, password: String) {
         viewModelScope.launch {
-            if (identifier.isBlank() || password.isBlank()) {
+            val cleanId = identifier.trim()
+            val cleanPass = password.trim()
+
+            if (cleanId.isBlank() || cleanPass.isBlank()) {
                 _toastMessage.emit("Please enter your email/phone and password.")
                 return@launch
             }
 
+            _isSyncing.value = true
+
             try {
-                val cleanId = identifier.trim()
-                val cleanPass = password.trim()
+                val isEmail = android.util.Patterns.EMAIL_ADDRESS.matcher(cleanId).matches() || cleanId.contains("@")
 
-                // 1. Authenticate locally / Firebase session
-                val localUser = repository.authenticateUser(cleanId, cleanPass)
-                if (localUser != null) {
-                    // Instantly log in local user so UI opens without delay
-                    loginUser(localUser)
+                if (isEmail) {
+                    // 1. Authenticate against Firebase Authentication with existing credentials
+                    val auth = FirebaseAuth.getInstance()
+                    val authResult = try {
+                        auth.signInWithEmailAndPassword(cleanId, cleanPass).await()
+                    } catch (e: Exception) {
+                        _isSyncing.value = false
+                        val errorMsg = formatFirebaseAuthError(e)
+                        _toastMessage.emit(errorMsg)
+                        return@launch
+                    }
 
-                    // Refresh/sync latest bar data from cloud in background
-                    _isSyncing.value = true
+                    val fbUser = authResult.user
+                    val fbEmail = fbUser?.email ?: cleanId
+
+                    // 2. Restore or load the matching Firestore bar backup
                     try {
-                        val syncResult = backupService.syncData(cleanId)
-                        if (syncResult.isSuccess) {
-                            repository.getUserByIdentifier(cleanId)?.let { updated ->
-                                loginUser(updated)
-                            }
-                        }
+                        backupService.syncData(fbEmail)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                    } finally {
+                    }
+
+                    // 3. Match the local user record using Firebase email, phone, or UID where available
+                    val allUsers = repository.getAllUsersSync()
+                    var localUser = repository.getUserByEmail(fbEmail)
+                        ?: repository.getUserByIdentifier(cleanId)
+                        ?: allUsers.firstOrNull { it.email.equals(fbEmail, ignoreCase = true) }
+                        ?: allUsers.firstOrNull { it.email.equals(cleanId, ignoreCase = true) }
+                        ?: allUsers.firstOrNull { it.role == UserRole.OWNER }
+
+                    if (localUser != null) {
+                        // 4. ADMIN -> OWNER migration (confirm migrated once only, status APPROVED)
+                        if (localUser.role == UserRole.OWNER || localUser.role.name == "ADMIN") {
+                            if (localUser.role != UserRole.OWNER || localUser.status != UserStatus.APPROVED) {
+                                val updatedUser = localUser.copy(role = UserRole.OWNER, status = UserStatus.APPROVED)
+                                repository.updateUser(updatedUser)
+                                localUser = updatedUser
+                            }
+                        }
                         _isSyncing.value = false
+                        loginUser(localUser)
+                    } else {
+                        _isSyncing.value = false
+                        _toastMessage.emit("Account verified with Firebase, but no bar profile found in cloud backup.")
                     }
-                    return@launch
-                }
-
-                // 2. User not found in local database yet (e.g. logging in on a new device or fresh install)
-                _isSyncing.value = true
-                try {
-                    if (android.util.Patterns.EMAIL_ADDRESS.matcher(cleanId).matches()) {
-                        val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
-                        if (!currentFbEmail.equals(cleanId, ignoreCase = true)) {
-                            FirebaseAuth.getInstance().signInWithEmailAndPassword(cleanId, cleanPass).await()
+                } else {
+                    // Phone / Attendant login
+                    var localUser = repository.getUserByIdentifier(cleanId)
+                    if (localUser == null) {
+                        try {
+                            backupService.syncData(cleanId)
+                            localUser = repository.getUserByIdentifier(cleanId)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
                     }
-                    val syncResult = backupService.syncData(cleanId)
-                    if (syncResult.isSuccess) {
-                        val syncedUser = repository.getUserByIdentifier(cleanId)
-                        if (syncedUser != null && syncedUser.password == cleanPass) {
-                            loginUser(syncedUser)
-                            return@launch
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    _isSyncing.value = false
-                }
 
-                _toastMessage.emit("Invalid credentials. Please verify your email/phone and password.")
+                    if (localUser != null) {
+                        if (localUser.password == cleanPass) {
+                            if (localUser.email.isNotBlank() && localUser.email.contains("@")) {
+                                try {
+                                    val currentFbEmail = FirebaseAuth.getInstance().currentUser?.email
+                                    if (!currentFbEmail.equals(localUser.email.trim(), ignoreCase = true)) {
+                                        FirebaseAuth.getInstance().signInWithEmailAndPassword(localUser.email.trim(), cleanPass).await()
+                                    }
+                                } catch (e: Exception) {
+                                    // non-blocking
+                                }
+                            }
+                            if (localUser.role == UserRole.OWNER || localUser.role.name == "ADMIN") {
+                                if (localUser.role != UserRole.OWNER || localUser.status != UserStatus.APPROVED) {
+                                    val updated = localUser.copy(role = UserRole.OWNER, status = UserStatus.APPROVED)
+                                    repository.updateUser(updated)
+                                    localUser = updated
+                                }
+                            }
+                            _isSyncing.value = false
+                            loginUser(localUser)
+                        } else {
+                            _isSyncing.value = false
+                            _toastMessage.emit("Wrong password. Please verify your password. [auth/wrong-password]")
+                        }
+                    } else {
+                        _isSyncing.value = false
+                        _toastMessage.emit("User not found. No account registered with '$cleanId'. [auth/user-not-found]")
+                    }
+                }
             } catch (e: Exception) {
                 _isSyncing.value = false
-                _toastMessage.emit("Login failed: ${e.message ?: "Invalid email/phone or password."}")
+                val errorMsg = formatFirebaseAuthError(e)
+                _toastMessage.emit("Login failed: $errorMsg")
             }
         }
     }
