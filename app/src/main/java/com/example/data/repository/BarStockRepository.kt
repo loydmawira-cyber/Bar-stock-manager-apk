@@ -1107,6 +1107,10 @@ class BarStockRepository(private val dao: BarStockDao) {
     suspend fun closeShiftAndReconcile(
         shiftId: Long,
         submittedCash: Double,
+        submittedMpesa: Double = 0.0,
+        submittedCard: Double = 0.0,
+        submittedBank: Double = 0.0,
+        submittedPayments: Map<String, Double> = emptyMap(),
         closingInputs: List<ClosingItemInput>,
         closingNotes: String = ""
     ): Pair<Shift, List<ShiftClosing>> {
@@ -1145,7 +1149,15 @@ class BarStockRepository(private val dao: BarStockDao) {
         }
 
         // 3. Compute variance
-        val variance = submittedCash - totalExpected
+        val paymentTotals = if (submittedPayments.isNotEmpty()) submittedPayments else mapOf(
+            "Cash" to submittedCash,
+            "M-Pesa" to submittedMpesa,
+            "Card" to submittedCard,
+            "Bank transfer" to submittedBank
+        )
+        val submittedTotal = paymentTotals.values.sum()
+        val breakdown = paymentTotals.entries.joinToString("; ") { "${it.key}=${String.format(Locale.US, "%.2f", it.value)}" }
+        val variance = submittedTotal - totalExpected
         val recType = when {
             variance < -0.01 -> ReconciliationType.LOSS
             variance > 0.01 -> ReconciliationType.EXTRA
@@ -1161,6 +1173,10 @@ class BarStockRepository(private val dao: BarStockDao) {
             status = ShiftStatus.CLOSED,
             totalExpectedSales = totalExpected,
             totalSubmittedCash = submittedCash,
+            totalSubmittedMpesa = submittedMpesa,
+            totalSubmittedCard = submittedCard,
+            totalSubmittedBank = submittedBank,
+            submittedPaymentBreakdown = breakdown,
             variance = variance,
             reconciliationType = recType,
             notes = closingNotes
@@ -1178,7 +1194,12 @@ class BarStockRepository(private val dao: BarStockDao) {
                 attendantName = shift.attendantName,
                 counterName = shift.counterName,
                 expectedTotal = totalExpected,
-                submittedTotal = submittedCash,
+                submittedTotal = submittedTotal,
+                submittedCash = submittedCash,
+                submittedMpesa = submittedMpesa,
+                submittedCard = submittedCard,
+                submittedBank = submittedBank,
+                submittedPaymentBreakdown = breakdown,
                 variance = variance,
                 type = recType,
                 date = System.currentTimeMillis(),
@@ -1190,9 +1211,9 @@ class BarStockRepository(private val dao: BarStockDao) {
         // 7. Push Notifications
         val varianceFormatted = String.format(Locale.US, "$%.2f", Math.abs(variance))
         val statusMessage = when (recType) {
-            ReconciliationType.LOSS -> "Closed with LOSS of $varianceFormatted. Expected: $${String.format(Locale.US, "%.2f", totalExpected)}, Submitted: $${String.format(Locale.US, "%.2f", submittedCash)}."
-            ReconciliationType.EXTRA -> "Closed with EXTRA of $varianceFormatted. Expected: $${String.format(Locale.US, "%.2f", totalExpected)}, Submitted: $${String.format(Locale.US, "%.2f", submittedCash)}."
-            ReconciliationType.BALANCED, ReconciliationType.NONE -> "Closed cleanly with balanced cash ($${String.format(Locale.US, "%.2f", totalExpected)})."
+            ReconciliationType.LOSS -> "Closed with LOSS of $varianceFormatted. Expected: $${String.format(Locale.US, "%.2f", totalExpected)}, Submitted across all methods: $${String.format(Locale.US, "%.2f", submittedTotal)}."
+            ReconciliationType.EXTRA -> "Closed with EXTRA of $varianceFormatted. Expected: $${String.format(Locale.US, "%.2f", totalExpected)}, Submitted across all methods: $${String.format(Locale.US, "%.2f", submittedTotal)}."
+            ReconciliationType.BALANCED, ReconciliationType.NONE -> "Closed cleanly with balanced sales ($${String.format(Locale.US, "%.2f", totalExpected)})."
         }
 
         // Notify Admin / Owner
