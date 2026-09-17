@@ -4,20 +4,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.AmberPrimary
 import com.example.data.model.Counter
 import com.example.ui.components.requiredLabel
 import com.example.ui.theme.CrimsonRed
@@ -51,43 +54,38 @@ fun AdminInventoryScreen(
     var deletingCounter by remember { mutableStateOf<Counter?>(null) }
     var editName by remember { mutableStateOf("") }
     var editLocation by remember { mutableStateOf("") }
-    val selectedIndex = locations.indexOfFirst { it.first == selectedLocation }.coerceAtLeast(0)
     val selectedCounter = counters.firstOrNull { it.id.toString() == selectedLocation }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            ScrollableTabRow(
-                selectedTabIndex = selectedIndex,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(64.dp),
-                edgePadding = 8.dp,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ) {
-                locations.forEachIndexed { index, location ->
-                    Tab(
-                        selected = selectedIndex == index,
-                        onClick = {
-                            selectedLocation = location.first
-                            menuExpanded = false
-                            if (location.first != "STORE") onSelectCounter(location.first.toLong())
-                        },
-                        selectedContentColor = MaterialTheme.colorScheme.primary,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 6.dp)
-                            .height(52.dp),
-                        text = {
-                            Text(
-                                text = location.second,
-                                fontSize = 14.sp,
-                                fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            locations.forEach { location ->
+                FilterChip(
+                    selected = selectedLocation == location.first,
+                    onClick = {
+                        selectedLocation = location.first
+                        menuExpanded = false
+                        if (location.first != "STORE") onSelectCounter(location.first.toLong())
+                    },
+                    label = {
+                        Text(
+                            text = location.second,
+                            fontSize = 14.sp,
+                            fontWeight = if (selectedLocation == location.first) FontWeight.Bold else FontWeight.Medium
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AmberPrimary,
+                        selectedLabelColor = Color.Black,
+                        containerColor = Color(0xFF252830),
+                        labelColor = Color.White
                     )
-                }
+                )
             }
             if (selectedCounter != null) {
                 IconButton(onClick = { menuExpanded = true }) {
