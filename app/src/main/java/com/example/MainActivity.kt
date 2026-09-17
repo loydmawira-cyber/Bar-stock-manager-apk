@@ -468,6 +468,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             },
                             onReceivePurchase = { itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes ->
                                 viewModel.receivePurchaseToStore(itemId, purchaseQuantity, unitsPerPurchaseUnit, purchaseUnitType, supplierName, receiptNumber, unitCost, notes)
+                            },
+                            onDeletePurchaseReceipt = { id ->
+                                viewModel.deletePurchaseReceipt(id)
                             }
                         )
                     }
