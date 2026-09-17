@@ -120,7 +120,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                 CounterStock(
                     counterId = counterId,
                     itemId = itemId,
-                    currentQuantity = 24, // 1 case initial stock
+                    currentQuantity = 0, // 1 case initial stock
                     minThreshold = 6
                 )
             )
