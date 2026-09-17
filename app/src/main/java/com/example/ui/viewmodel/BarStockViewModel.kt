@@ -81,11 +81,23 @@ data class ClosingCountState(
     val unitPrice: Double,
     val openingQty: Int,
     val adjustmentQty: Int,
-    val closingQty: Int
+    val closingQty: Int,
+    val totEnabled: Boolean = false,
+    val bottleVolumeMl: Int = 0,
+    val closingLooseMl: Int = 0,
+    val totSizeMl: Int = 0,
+    val totPrice: Double = 0.0
 ) {
     val effectiveOpening: Int get() = openingQty + adjustmentQty
     val unitsSold: Int get() = maxOf(0, effectiveOpening - closingQty)
-    val expectedAmount: Double get() = unitsSold * unitPrice
+    val closingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
+    val openingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
+    val volumeSoldMl: Int get() = maxOf(0, openingVolumeMl - closingVolumeMl)
+    val expectedAmount: Double get() = if (totEnabled && bottleVolumeMl > 0) {
+        val fullBottles = volumeSoldMl / bottleVolumeMl
+        val remainderMl = volumeSoldMl % bottleVolumeMl
+        fullBottles * unitPrice + if (totSizeMl > 0) (remainderMl / totSizeMl) * totPrice else 0.0
+    } else unitsSold * unitPrice
 }
 
 class BarStockViewModel(
@@ -990,7 +1002,12 @@ class BarStockViewModel(
                     unitPrice = input.unitPrice,
                     openingQty = input.openingQty,
                     adjustmentQty = input.adjustmentQty,
-                    closingQty = input.closingQty
+                    closingQty = input.closingQty,
+                    totEnabled = input.totEnabled,
+                    bottleVolumeMl = input.bottleVolumeMl,
+                    closingLooseMl = input.closingLooseMl,
+                    totSizeMl = input.totSizeMl,
+                    totPrice = input.totPrice
                 )
             }
             _submittedCashInput.value = ""
@@ -999,10 +1016,10 @@ class BarStockViewModel(
         }
     }
 
-    fun updateClosingQty(itemId: Long, count: Int) {
+    fun updateClosingQty(itemId: Long, count: Int, looseMl: Int? = null) {
         _closingItems.value = _closingItems.value.map {
             if (it.itemId == itemId) {
-                it.copy(closingQty = maxOf(0, count))
+                it.copy(closingQty = maxOf(0, count), closingLooseMl = looseMl?.coerceAtLeast(0) ?: it.closingLooseMl)
             } else it
         }
     }
@@ -1036,6 +1053,7 @@ class BarStockViewModel(
                     openingQty = item.openingQty,
                     adjustmentQty = item.adjustmentQty,
                     closingQty = item.closingQty
+                    ,closingLooseMl = item.closingLooseMl
                 )
             }
 
