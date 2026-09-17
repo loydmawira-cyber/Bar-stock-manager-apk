@@ -545,8 +545,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     ItemManagementScreen(
                         currentUser = currentUser,
                         items = allItems,
-                        onCreateItem = { name, category, unitPrice, casePrice, unitType, desc ->
-                            viewModel.createStockItem(name, category, unitPrice, casePrice, unitType, desc)
+                        onCreateItem = { name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost ->
+                            viewModel.createStockItem(name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost)
                         },
                         onUpdateItem = { itemId, name, category, unitPrice, casePrice, unitType, desc ->
                             viewModel.updateStockItem(itemId, name, category, unitPrice, casePrice, unitType, desc)
