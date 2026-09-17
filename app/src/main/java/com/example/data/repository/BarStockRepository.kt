@@ -120,7 +120,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                 CounterStock(
                     counterId = counterId,
                     itemId = itemId,
-                    currentQuantity = 0, // 1 case initial stock
+                    currentQuantity = 0, // New bars start with zero stock
                     minThreshold = 6
                 )
             )
@@ -517,6 +517,46 @@ class BarStockRepository(private val dao: BarStockDao) {
 
     fun getStoreStockWithItems(): Flow<List<StoreStockWithItem>> = dao.getAllStoreStockWithItems()
     val allPurchaseReceipts: Flow<List<PurchaseReceipt>> = dao.getAllPurchaseReceipts()
+
+    suspend fun deletePurchaseReceipt(id: Long) {
+        val receipt = dao.getAllPurchaseReceiptsSync().firstOrNull { it.id == id } ?: return
+
+        if (receipt.destination.equals("STORE", ignoreCase = true)) {
+            // Receipt added stock directly into the Store — reverse that addition.
+            val store = dao.getStoreStock(receipt.itemId)
+            if (store != null) {
+                dao.insertStoreStock(
+                    store.copy(currentQuantity = maxOf(0, store.currentQuantity - receipt.unitsReceived))
+                )
+            }
+        } else {
+            // Receipt added stock into a specific counter — reverse that addition.
+            val counter = dao.getAllCountersSync().firstOrNull { it.name == receipt.destination }
+            if (counter != null) {
+                val counterStock = dao.getCounterStock(counter.id, receipt.itemId)
+                if (counterStock != null) {
+                    dao.insertCounterStock(
+                        counterStock.copy(currentQuantity = maxOf(0, counterStock.currentQuantity - receipt.unitsReceived))
+                    )
+                }
+            }
+            // If the counter restock was itself sourced from Store, that transfer had
+            // deducted Store stock — give it back.
+            if (receipt.supplierName == INTERNAL_TRANSFER_SUPPLIER_NAME) {
+                val store = dao.getStoreStock(receipt.itemId)
+                dao.insertStoreStock(
+                    StoreStock(
+                        id = store?.id ?: 0L,
+                        itemId = receipt.itemId,
+                        currentQuantity = (store?.currentQuantity ?: 0) + receipt.unitsReceived,
+                        minThreshold = store?.minThreshold ?: 0
+                    )
+                )
+            }
+        }
+
+        dao.deletePurchaseReceipt(id)
+    }
 
     suspend fun receivePurchaseToStore(
         itemId: Long,
