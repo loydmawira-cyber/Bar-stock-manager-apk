@@ -66,9 +66,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -158,11 +156,6 @@ fun AdminDashboardScreen(
     var restockPurchaseUnit by remember { mutableStateOf("Crate") }
     var restockUnitsPerPurchaseUnit by remember { mutableStateOf("24") }
     var expandedPurchaseUnit by remember { mutableStateOf(false) }
-    var selectedOverviewLocation by remember { mutableStateOf("STORE") }
-    val overviewLocations = remember(counters) {
-        counters.map { it.id.toString() to it.name } + ("STORE" to "Store")
-    }
-
     val activeShiftsCount = counters.count { it.activeAttendantId != null }
     val openDisputesCount = disputes.count { it.status == com.example.data.model.DisputeStatus.OPEN }
     val pendingApprovalsCount = pendingUsers.size
@@ -462,9 +455,13 @@ fun AdminDashboardScreen(
             }
         }
 
-        // Live Selling Counters / Store filter tabs
+        // Live Selling Counters Section (Direct operational overview)
         item {
-            Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = "LIVE SELLING COUNTERS",
                     style = MaterialTheme.typography.labelMedium,
@@ -472,36 +469,10 @@ fun AdminDashboardScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                ScrollableTabRow(
-                    selectedTabIndex = overviewLocations.indexOfFirst { it.first == selectedOverviewLocation }.coerceAtLeast(0),
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    edgePadding = 6.dp,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ) {
-                    overviewLocations.forEachIndexed { index, location ->
-                        Tab(
-                            selected = location.first == selectedOverviewLocation,
-                            onClick = { selectedOverviewLocation = location.first },
-                            selectedContentColor = AmberPrimary,
-                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.height(48.dp),
-                            text = {
-                                Text(
-                                    text = location.second,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (location.first == selectedOverviewLocation) FontWeight.Bold else FontWeight.Medium,
-                                    maxLines = 1
-                                )
-                            }
-                        )
-                    }
-                }
             }
         }
 
-        items(counters.filter { it.id.toString() == selectedOverviewLocation }) { counter ->
+        items(counters) { counter ->
             val isActive = counter.activeAttendantId != null
             val activeShiftForCounter = shifts.firstOrNull {
                 it.counterId == counter.id && it.status == com.example.data.model.ShiftStatus.ACTIVE
@@ -597,34 +568,6 @@ fun AdminDashboardScreen(
             }
         }
 
-        if (selectedOverviewLocation == "STORE") {
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("STORE STOCK", fontWeight = FontWeight.Bold, color = AmberPrimary, letterSpacing = 1.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (storeStock.isEmpty()) {
-                            Text("No store stock recorded yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                        } else {
-                            storeStock.forEach { stock ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(stock.itemName, color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                    Text("${stock.currentQuantity} ${stock.unitType}s", color = AmberPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // Mid-Shift Restock / Adjustment Modal
