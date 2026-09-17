@@ -301,6 +301,14 @@ class BarStockViewModel(
 
     private val _submittedCashInput = MutableStateFlow("")
     val submittedCashInput: StateFlow<String> = _submittedCashInput.asStateFlow()
+    private val _submittedMpesaInput = MutableStateFlow("0")
+    val submittedMpesaInput: StateFlow<String> = _submittedMpesaInput.asStateFlow()
+    private val _submittedCardInput = MutableStateFlow("0")
+    val submittedCardInput: StateFlow<String> = _submittedCardInput.asStateFlow()
+    private val _submittedBankInput = MutableStateFlow("0")
+    val submittedBankInput: StateFlow<String> = _submittedBankInput.asStateFlow()
+    private val _submittedPaymentInputs = MutableStateFlow<Map<String, String>>(emptyMap())
+    val submittedPaymentInputs: StateFlow<Map<String, String>> = _submittedPaymentInputs.asStateFlow()
 
     private val _closingNotesInput = MutableStateFlow("")
     val closingNotesInput: StateFlow<String> = _closingNotesInput.asStateFlow()
@@ -725,6 +733,7 @@ class BarStockViewModel(
         customPhotoUri: String?,
         contactPhone: String,
         currencySymbol: String,
+        paymentMethods: String,
         managerName: String,
         openingHours: String
     ) {
@@ -741,6 +750,7 @@ class BarStockViewModel(
                 customPhotoUri = customPhotoUri,
                 contactPhone = contactPhone.trim(),
                 currencySymbol = currencySymbol.ifBlank { "$" },
+                paymentMethods = paymentMethods.split(",").map { it.trim() }.filter { it.isNotBlank() }.distinct().joinToString(","),
                 managerName = managerName.trim(),
                 openingHours = openingHours.trim(),
                 isRegistered = true,
@@ -1035,6 +1045,10 @@ class BarStockViewModel(
                 )
             }
             _submittedCashInput.value = ""
+            _submittedMpesaInput.value = "0"
+            _submittedCardInput.value = "0"
+            _submittedBankInput.value = "0"
+            _submittedPaymentInputs.value = barProfile.value.paymentMethods.split(",").map { it.trim() }.filter { it.isNotBlank() }.associateWith { "0" }
             _closingNotesInput.value = ""
             _currentScreen.value = AppScreen.SHIFT_CLOSING
         }
@@ -1052,6 +1066,13 @@ class BarStockViewModel(
         _submittedCashInput.value = value
     }
 
+    fun updateSubmittedMpesaInput(value: String) { _submittedMpesaInput.value = value }
+    fun updateSubmittedCardInput(value: String) { _submittedCardInput.value = value }
+    fun updateSubmittedBankInput(value: String) { _submittedBankInput.value = value }
+    fun updateSubmittedPayment(method: String, value: String) {
+        _submittedPaymentInputs.value = _submittedPaymentInputs.value.toMutableMap().apply { put(method, value) }
+    }
+
     fun updateClosingNotes(value: String) {
         _closingNotesInput.value = value
     }
@@ -1059,7 +1080,12 @@ class BarStockViewModel(
     fun submitShiftClosing() {
         val shift = activeShift.value ?: return
         val submittedCash = _submittedCashInput.value.toDoubleOrNull()
-        if (submittedCash == null || submittedCash < 0) {
+        val submittedMpesa = _submittedMpesaInput.value.toDoubleOrNull() ?: 0.0
+        val submittedCard = _submittedCardInput.value.toDoubleOrNull() ?: 0.0
+        val submittedBank = _submittedBankInput.value.toDoubleOrNull() ?: 0.0
+        val configuredPayments = _submittedPaymentInputs.value
+        val submittedPaymentTotal = configuredPayments.values.sumOf { it.toDoubleOrNull() ?: 0.0 }
+        if (submittedCash == null || submittedCash < 0 || submittedMpesa < 0 || submittedCard < 0 || submittedBank < 0 || configuredPayments.values.any { (it.toDoubleOrNull() ?: -1.0) < 0 }) {
             viewModelScope.launch {
                 _toastMessage.emit("Please enter a valid cash amount submitted.")
             }
@@ -1084,6 +1110,10 @@ class BarStockViewModel(
             val (closedShift, closings) = repository.closeShiftAndReconcile(
                 shiftId = shift.id,
                 submittedCash = submittedCash,
+                submittedMpesa = submittedMpesa,
+                submittedCard = submittedCard,
+                submittedBank = submittedBank,
+                submittedPayments = configuredPayments.mapValues { it.value.toDoubleOrNull() ?: 0.0 },
                 closingInputs = inputs,
                 closingNotes = _closingNotesInput.value
             )
