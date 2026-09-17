@@ -1400,9 +1400,11 @@ class BarStockRepository(private val dao: BarStockDao) {
             .filter { it.purchaseDate in startDate..endDate && it.supplierName != INTERNAL_TRANSFER_SUPPLIER_NAME }
         val allStoreStocks = dao.getAllStoreStocksSync()
         val allCounterStocks = dao.getAllCounterStocksSync()
-        // Only items currently stocked somewhere (Store or any Counter) belong in the
-        // profitability breakdown — items never received/stocked shouldn't clutter it.
-        val stockedItemIds = (allStoreStocks.map { it.itemId } + allCounterStocks.map { it.itemId }).toSet()
+        // Only items with actual stock on hand right now (Store or any Counter) belong
+        // in the profitability breakdown — a stock row can exist at zero quantity, so
+        // check the quantity itself rather than just row existence.
+        val stockedItemIds = (allStoreStocks.filter { it.currentQuantity > 0 }.map { it.itemId } +
+            allCounterStocks.filter { it.currentQuantity > 0 }.map { it.itemId }).toSet()
 
         // Make sure every item's daily cost history is caught up before valuing anything.
         ensureDailyCostSnapshotsForAllItems()
