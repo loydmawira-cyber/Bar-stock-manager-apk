@@ -13,6 +13,7 @@ data class CounterStock(
     val counterId: Long,
     val itemId: Long,
     val currentQuantity: Int,
+    val looseMl: Int = 0,
     val minThreshold: Int = 5
 )
 
@@ -26,5 +27,6 @@ data class CounterStockWithItem(
     val casePrice: Double,
     val unitType: String,
     val currentQuantity: Int,
+    val looseMl: Int,
     val minThreshold: Int
 )
