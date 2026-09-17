@@ -295,6 +295,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         shifts = allShifts,
                         currentUserRole = currentUser?.role ?: UserRole.OWNER,
                         storeStock = storeStock,
+                        counterStockQuantities = allCounterStocks.groupBy { it.counterId }.mapValues { (_, stocks) -> stocks.sumOf { it.currentQuantity } },
                         shiftClosings = allShiftClosings,
                         disputes = allDisputes,
                         pendingUsers = pendingUsers,
@@ -311,6 +312,12 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         },
                         onSelectCounterForManagement = { counterId ->
                             viewModel.setSelectedCounterForManagement(counterId)
+                        },
+                        onUpdateCounter = { counterId, name, location ->
+                            viewModel.updateCounter(counterId, name, location)
+                        },
+                        onDeleteCounter = { counterId, destinationCounterId ->
+                            viewModel.deleteCounter(counterId, destinationCounterId)
                         }
                     )
                 }
@@ -481,10 +488,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 AppScreen.STORE_INVENTORY -> {
                     AdminInventoryScreen(
                         counters = allCounters,
-                        counterStockQuantities = allCounterStocks.groupBy { it.counterId }.mapValues { (_, stocks) -> stocks.sumOf { it.currentQuantity } },
                         onSelectCounter = { viewModel.setSelectedCounterForManagement(it) },
-                        onUpdateCounter = { counterId, name, location -> viewModel.updateCounter(counterId, name, location) },
-                        onDeleteCounter = { counterId, destinationCounterId -> viewModel.deleteCounter(counterId, destinationCounterId) },
                         countersContent = {
                             CounterManagementScreen(
                                 currentUser = currentUser,
@@ -551,11 +555,11 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     ItemManagementScreen(
                         currentUser = currentUser,
                         items = allItems,
-                        onCreateItem = { name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost ->
-                            viewModel.createStockItem(name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost)
+                        onCreateItem = { name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost, totEnabled, bottleVolumeMl, totSizeMl, totPrice ->
+                            viewModel.createStockItem(name, category, unitPrice, casePrice, unitType, desc, openingQty, openingCost, totEnabled, bottleVolumeMl, totSizeMl, totPrice)
                         },
-                        onUpdateItem = { itemId, name, category, unitPrice, casePrice, unitType, desc ->
-                            viewModel.updateStockItem(itemId, name, category, unitPrice, casePrice, unitType, desc)
+                        onUpdateItem = { itemId, name, category, unitPrice, casePrice, unitType, desc, totEnabled, bottleVolumeMl, totSizeMl, totPrice ->
+                            viewModel.updateStockItem(itemId, name, category, unitPrice, casePrice, unitType, desc, totEnabled, bottleVolumeMl, totSizeMl, totPrice)
                         },
                         onDeleteItem = { itemId ->
                             viewModel.deleteStockItem(itemId)
