@@ -305,8 +305,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onAddStockAdjustment = { counterId, itemId, qty, reason ->
                             viewModel.addStockAdjustment(counterId, itemId, qty, reason)
                         },
-                        onRestockCounterFromSource = { counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason ->
-                            viewModel.restockCounterFromSource(counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason)
+                        onRestockCounterFromSource = { counterId, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receiptNumber, unitCost, reason ->
+                            viewModel.restockCounterFromSource(counterId, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receiptNumber, unitCost, reason)
                         },
                         onSelectCounterForManagement = { counterId ->
                             viewModel.setSelectedCounterForManagement(counterId)
@@ -497,7 +497,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                                 onDeleteCounter = { viewModel.deleteCounter(it) },
                                 onAssignItemToCounter = { id, itemId, qty -> viewModel.assignItemToCounter(id, itemId, qty) },
                                 onRestockClick = { viewModel.setSelectedCounterForManagement(it.id) },
-                                onRestockCounterFromSource = { id, itemId, qty, source, supplier, receipt, cost, reason -> viewModel.restockCounterFromSource(id, itemId, qty, source, supplier, receipt, cost, reason) },
+                                onRestockCounterFromSource = { id, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receipt, cost, reason -> viewModel.restockCounterFromSource(id, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receipt, cost, reason) },
                                 showCounterSelector = false
                             )
                         },
@@ -539,8 +539,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onRestockClick = { counter ->
                             viewModel.setSelectedCounterForManagement(counter.id)
                         },
-                        onRestockCounterFromSource = { counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason ->
-                            viewModel.restockCounterFromSource(counterId, itemId, qty, source, supplier, receiptNumber, unitCost, reason)
+                        onRestockCounterFromSource = { counterId, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receiptNumber, unitCost, reason ->
+                            viewModel.restockCounterFromSource(counterId, itemId, qty, unitsPerPurchaseUnit, purchaseUnitType, source, supplier, receiptNumber, unitCost, reason)
                         }
                     )
                 }
