@@ -444,7 +444,11 @@ class BarStockRepository(private val dao: BarStockDao) {
         unitPrice: Double,
         casePrice: Double,
         unitType: String,
-        description: String = ""
+        description: String = "",
+        totEnabled: Boolean = false,
+        bottleVolumeMl: Int = 0,
+        totSizeMl: Int = 0,
+        totPrice: Double = 0.0
     ): Long {
         return dao.insertItem(
             Item(
@@ -453,7 +457,11 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitPrice = unitPrice,
                 casePrice = casePrice,
                 unitType = unitType,
-                description = description
+                description = description,
+                totEnabled = totEnabled,
+                bottleVolumeMl = bottleVolumeMl,
+                totSizeMl = totSizeMl,
+                totPrice = totPrice
             )
         )
     }
@@ -473,10 +481,14 @@ class BarStockRepository(private val dao: BarStockDao) {
         description: String = "",
         openingStockQuantity: Int = 0,
         openingStockCostPerUnit: Double = 0.0,
+        totEnabled: Boolean = false,
+        bottleVolumeMl: Int = 0,
+        totSizeMl: Int = 0,
+        totPrice: Double = 0.0,
         receivedByUserId: Long? = null,
         receivedByName: String = "Admin"
     ): Long {
-        val itemId = addItem(name, category, unitPrice, casePrice, unitType, description)
+        val itemId = addItem(name, category, unitPrice, casePrice, unitType, description, totEnabled, bottleVolumeMl, totSizeMl, totPrice)
         if (openingStockQuantity > 0 && openingStockCostPerUnit > 0) {
             receivePurchaseToStore(
                 itemId = itemId,
