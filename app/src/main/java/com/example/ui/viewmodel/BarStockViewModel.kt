@@ -26,8 +26,10 @@ import com.example.data.model.StockVerification
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.data.model.UserStatus
+import com.example.data.model.MonthlyReport
 import com.example.data.repository.BarStockRepository
 import com.example.data.repository.BackupService
+import com.example.data.repository.MonthlyReportService
 import com.example.data.util.PasswordValidator
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,7 +61,8 @@ enum class AppScreen {
     NOTIFICATIONS,
     STORE_INVENTORY,
     EXPENSES_MANAGEMENT,
-    PROFIT_LOSS_REPORT
+    PROFIT_LOSS_REPORT,
+    MONTHLY_REPORTS
 }
 
 data class OpeningVerificationState(
@@ -103,7 +106,8 @@ data class ClosingCountState(
 class BarStockViewModel(
     private val repository: BarStockRepository,
     private val backupService: BackupService,
-    private val billingManager: BillingManager
+    private val billingManager: BillingManager,
+    private val monthlyReportService: MonthlyReportService = MonthlyReportService()
 ) : ViewModel() {
 
     // Billing state & actions
@@ -300,6 +304,26 @@ class BarStockViewModel(
 
     private val _closingNotesInput = MutableStateFlow("")
     val closingNotesInput: StateFlow<String> = _closingNotesInput.asStateFlow()
+
+    private val _monthlyReports = MutableStateFlow<List<MonthlyReport>>(emptyList())
+    val monthlyReports: StateFlow<List<MonthlyReport>> = _monthlyReports.asStateFlow()
+    private val _monthlyReportsLoading = MutableStateFlow(false)
+    val monthlyReportsLoading: StateFlow<Boolean> = _monthlyReportsLoading.asStateFlow()
+
+    fun loadMonthlyReports() {
+        if (_currentUser.value?.role != UserRole.OWNER) return
+        viewModelScope.launch {
+            _monthlyReportsLoading.value = true
+            try {
+                val barId = repository.getBarProfileSync()?.let { "bar_${it.barId}" } ?: return@launch
+                _monthlyReports.value = monthlyReportService.listReports(barId)
+            } catch (e: Exception) {
+                _toastMessage.emit(e.message ?: "Unable to load monthly reports.")
+            } finally {
+                _monthlyReportsLoading.value = false
+            }
+        }
+    }
 
     // Shift summary receipt
     private val _lastClosedShift = MutableStateFlow<Shift?>(null)
