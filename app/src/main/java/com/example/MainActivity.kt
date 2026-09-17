@@ -120,6 +120,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
 
     val allItems by viewModel.allItems.collectAsState()
     val allCounters by viewModel.allCounters.collectAsState()
+    val allCounterStocks by viewModel.allCounterStocks.collectAsState()
     val allShifts by viewModel.allShifts.collectAsState()
     val allShiftClosings by viewModel.allShiftClosings.collectAsState()
     val storeStock by viewModel.storeStock.collectAsState()
@@ -480,9 +481,10 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 AppScreen.STORE_INVENTORY -> {
                     AdminInventoryScreen(
                         counters = allCounters,
+                        counterStockQuantities = allCounterStocks.groupBy { it.counterId }.mapValues { (_, stocks) -> stocks.sumOf { it.currentQuantity } },
                         onSelectCounter = { viewModel.setSelectedCounterForManagement(it) },
                         onUpdateCounter = { counterId, name, location -> viewModel.updateCounter(counterId, name, location) },
-                        onDeleteCounter = { counterId -> viewModel.deleteCounter(counterId) },
+                        onDeleteCounter = { counterId, destinationCounterId -> viewModel.deleteCounter(counterId, destinationCounterId) },
                         countersContent = {
                             CounterManagementScreen(
                                 currentUser = currentUser,
