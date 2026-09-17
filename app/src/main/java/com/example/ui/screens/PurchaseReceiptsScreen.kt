@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -25,6 +28,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +46,7 @@ import com.example.data.model.PurchaseReceipt
 import com.example.ui.components.formatCurrency
 import com.example.ui.components.formatDateTime
 import com.example.ui.theme.AmberPrimary
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurface
 import java.util.Calendar
 
@@ -52,10 +57,13 @@ fun PurchaseReceiptsScreen(
     receipts: List<PurchaseReceipt>,
     counters: List<Counter> = emptyList(),
     items: List<Item> = emptyList(),
-    onReceivePurchase: ((itemId: Long, purchaseQuantity: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, supplierName: String, receiptNumber: String, unitCost: Double, notes: String) -> Unit)? = null
+    onReceivePurchase: ((itemId: Long, purchaseQuantity: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, supplierName: String, receiptNumber: String, unitCost: Double, notes: String) -> Unit)? = null,
+    isOwner: Boolean = false,
+    onDeleteReceipt: (Long) -> Unit = {}
 ) {
     val now = remember { Calendar.getInstance() }
     var showReceiveDialog by remember { mutableStateOf(false) }
+    var receiptPendingDelete by remember { mutableStateOf<PurchaseReceipt?>(null) }
     var selectedDestination by remember { mutableStateOf("All") }
     var destinationExpanded by remember { mutableStateOf(false) }
     var selectedTimeFilter by remember { mutableStateOf(PurchaseTimeFilter.TODAY) }
@@ -176,7 +184,18 @@ fun PurchaseReceiptsScreen(
             item { Text("No purchase receipts match the selected filters.", color = Color.LightGray, modifier = Modifier.padding(vertical = 24.dp)) }
         } else {
             items(filteredReceipts) { receipt ->
-                Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = { if (isOwner) receiptPendingDelete = receipt }
+                        )
+                ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(receipt.itemName, color = Color.White, fontWeight = FontWeight.Bold)
@@ -201,6 +220,29 @@ fun PurchaseReceiptsScreen(
             onConfirm = { itemId, qty, pack, unit, supplier, receipt, cost, notes ->
                 onReceivePurchase(itemId, qty, pack, unit, supplier, receipt, cost, notes)
                 showReceiveDialog = false
+            }
+        )
+    }
+
+    receiptPendingDelete?.let { receipt ->
+        AlertDialog(
+            onDismissRequest = { receiptPendingDelete = null },
+            title = { Text("Delete Purchase Receipt?") },
+            text = {
+                Text("This will permanently delete the receipt for \"${receipt.itemName}\" (${receipt.receiptNumber.ifBlank { "No receipt number" }}) and reverse the ${receipt.unitsReceived} ${receipt.stockUnitType} it added to stock. This cannot be undone.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteReceipt(receipt.id)
+                    receiptPendingDelete = null
+                }) {
+                    Text("Delete", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { receiptPendingDelete = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }

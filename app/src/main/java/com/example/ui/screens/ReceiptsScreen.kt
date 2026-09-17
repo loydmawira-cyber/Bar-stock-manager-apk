@@ -67,7 +67,8 @@ fun ReceiptsScreen(
     onSelectAttendantFilter: (Long?) -> Unit,
     onAddExpense: (category: String, description: String, amount: String, paymentMethod: String, refNumber: String, notes: String?) -> Unit = { _, _, _, _, _, _ -> },
     onDeleteExpense: (Long) -> Unit = {},
-    onReceivePurchase: ((itemId: Long, purchaseQuantity: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, supplierName: String, receiptNumber: String, unitCost: Double, notes: String) -> Unit)? = null
+    onReceivePurchase: ((itemId: Long, purchaseQuantity: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, supplierName: String, receiptNumber: String, unitCost: Double, notes: String) -> Unit)? = null,
+    onDeletePurchaseReceipt: (Long) -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddExpenseDialog by remember { mutableStateOf(false) }
@@ -118,7 +119,9 @@ fun ReceiptsScreen(
                     receipts = purchaseReceipts,
                     counters = counters,
                     items = items,
-                    onReceivePurchase = onReceivePurchase
+                    onReceivePurchase = onReceivePurchase,
+                    isOwner = currentUser.role == com.example.data.model.UserRole.OWNER,
+                    onDeleteReceipt = onDeletePurchaseReceipt
                 )
             }
             2 -> {
