@@ -1037,11 +1037,21 @@ class BarStockRepository(private val dao: BarStockDao) {
         val unitPrice: Double,
         val openingQty: Int,
         val adjustmentQty: Int,
-        val closingQty: Int
+        val closingQty: Int,
+        val closingLooseMl: Int = 0,
+        val totEnabled: Boolean = false,
+        val bottleVolumeMl: Int = 0,
+        val totSizeMl: Int = 0,
+        val totPrice: Double = 0.0
     ) {
         val effectiveOpening: Int = openingQty + adjustmentQty
         val unitsSold: Int = maxOf(0, effectiveOpening - closingQty)
-        val expectedAmount: Double = unitsSold * unitPrice
+        val openingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
+        val closingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
+        val volumeSoldMl: Int = maxOf(0, openingVolumeMl - closingVolumeMl)
+        val expectedAmount: Double = if (totEnabled && bottleVolumeMl > 0) {
+            (volumeSoldMl / bottleVolumeMl) * unitPrice + if (totSizeMl > 0) ((volumeSoldMl % bottleVolumeMl) / totSizeMl) * totPrice else 0.0
+        } else unitsSold * unitPrice
     }
 
     suspend fun getOpeningAndAdjustmentDataForClosing(shiftId: Long, counterId: Long): List<ClosingItemInput> {
@@ -1059,6 +1069,10 @@ class BarStockRepository(private val dao: BarStockDao) {
                 openingQty = ver.attendantEnteredQty,
                 adjustmentQty = netAdj,
                 closingQty = maxOf(0, ver.attendantEnteredQty + netAdj)
+                ,totEnabled = dao.getItemById(ver.itemId)?.totEnabled ?: false
+                ,bottleVolumeMl = dao.getItemById(ver.itemId)?.bottleVolumeMl ?: 0
+                ,totSizeMl = dao.getItemById(ver.itemId)?.totSizeMl ?: 0
+                ,totPrice = dao.getItemById(ver.itemId)?.totPrice ?: 0.0
             )
         }.toMutableList()
 
@@ -1078,6 +1092,10 @@ class BarStockRepository(private val dao: BarStockDao) {
                         openingQty = 0,
                         adjustmentQty = netAdj,
                         closingQty = maxOf(0, netAdj)
+                        ,totEnabled = item.totEnabled
+                        ,bottleVolumeMl = item.bottleVolumeMl
+                        ,totSizeMl = item.totSizeMl
+                        ,totPrice = item.totPrice
                     )
                 )
             }
@@ -1099,8 +1117,8 @@ class BarStockRepository(private val dao: BarStockDao) {
         var totalExpected = 0.0
         val closingEntities = closingInputs.map { item ->
             val effectiveOpening = item.openingQty + item.adjustmentQty
-            val unitsSold = maxOf(0, effectiveOpening - item.closingQty)
-            val expectedAmount = unitsSold * item.unitPrice
+            val unitsSold = item.unitsSold
+            val expectedAmount = item.expectedAmount
             totalExpected += expectedAmount
 
             ShiftClosing(
@@ -1115,14 +1133,15 @@ class BarStockRepository(private val dao: BarStockDao) {
                 effectiveOpeningQty = effectiveOpening,
                 closingQty = item.closingQty,
                 unitsSold = unitsSold,
-                expectedAmount = expectedAmount
+                expectedAmount = expectedAmount,
+                closingLooseMl = item.closingLooseMl
             )
         }
         dao.insertShiftClosings(closingEntities)
 
         // 2. Update Counter stock quantities to closing quantities
         closingInputs.forEach { item ->
-            dao.updateStockQuantity(shift.counterId, item.itemId, item.closingQty)
+            dao.updateStockQuantity(shift.counterId, item.itemId, item.closingQty, item.closingLooseMl)
         }
 
         // 3. Compute variance
