@@ -42,6 +42,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,8 +80,8 @@ import com.example.ui.theme.SkyBlue
 fun ItemManagementScreen(
     currentUser: User?,
     items: List<Item>,
-    onCreateItem: (name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String, openingStockQuantity: Int, openingStockCostPerUnit: Double) -> Unit,
-    onUpdateItem: (itemId: Long, name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String) -> Unit = { _, _, _, _, _, _, _ -> },
+    onCreateItem: (name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String, openingStockQuantity: Int, openingStockCostPerUnit: Double, totEnabled: Boolean, bottleVolumeMl: Int, totSizeMl: Int, totPrice: Double) -> Unit,
+    onUpdateItem: (itemId: Long, name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String, totEnabled: Boolean, bottleVolumeMl: Int, totSizeMl: Int, totPrice: Double) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onDeleteItem: (itemId: Long) -> Unit = {},
     onSyncData: () -> Unit = {}
 ) {
@@ -97,6 +98,10 @@ fun ItemManagementScreen(
     var itemDesc by remember { mutableStateOf("") }
     var openingStockQty by remember { mutableStateOf("") }
     var openingStockCost by remember { mutableStateOf("") }
+    var totEnabled by remember { mutableStateOf(false) }
+    var bottleVolumeMl by remember { mutableStateOf("") }
+    var totSizeMl by remember { mutableStateOf("") }
+    var totPrice by remember { mutableStateOf("") }
     var expandedCategoryMenu by remember { mutableStateOf(false) }
 
     fun openEditDialog(item: Item) {
@@ -107,6 +112,10 @@ fun ItemManagementScreen(
         itemCasePrice = item.casePrice.toString()
         itemUnitType = item.unitType
         itemDesc = item.description
+        totEnabled = item.totEnabled
+        bottleVolumeMl = item.bottleVolumeMl.takeIf { it > 0 }?.toString() ?: ""
+        totSizeMl = item.totSizeMl.takeIf { it > 0 }?.toString() ?: ""
+        totPrice = item.totPrice.takeIf { it > 0 }?.toString() ?: ""
     }
 
     LazyColumn(
@@ -204,6 +213,10 @@ fun ItemManagementScreen(
                             itemDesc = ""
                             openingStockQty = ""
                             openingStockCost = ""
+                            totEnabled = false
+                            bottleVolumeMl = ""
+                            totSizeMl = ""
+                            totPrice = ""
                             showAddItemDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
@@ -323,7 +336,11 @@ fun ItemManagementScreen(
         val openingCostVal = openingStockCost.toDoubleOrNull()
         val hasOpeningQty = openingQtyVal != null && openingQtyVal > 0
         val isOpeningStockValid = !hasOpeningQty || (openingCostVal != null && openingCostVal > 0.0)
-        val isFormValid = isNameValid && isPriceValid && isUnitValid && isOpeningStockValid
+        val bottleMlVal = bottleVolumeMl.toIntOrNull() ?: 0
+        val totMlVal = totSizeMl.toIntOrNull() ?: 0
+        val totPriceVal = totPrice.toDoubleOrNull() ?: 0.0
+        val isTotValid = !totEnabled || (bottleMlVal > 0 && totMlVal > 0 && totMlVal <= bottleMlVal && totPriceVal > 0.0)
+        val isFormValid = isNameValid && isPriceValid && isUnitValid && isOpeningStockValid && isTotValid
 
         AlertDialog(
             onDismissRequest = { showAddItemDialog = false },
@@ -418,6 +435,18 @@ fun ItemManagementScreen(
                         singleLine = true
                     )
 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Enable sale by tot", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Switch(checked = totEnabled, onCheckedChange = { totEnabled = it })
+                    }
+                    if (totEnabled) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = bottleVolumeMl, onValueChange = { bottleVolumeMl = it }, label = requiredLabel("Bottle ml"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
+                            OutlinedTextField(value = totSizeMl, onValueChange = { totSizeMl = it }, label = requiredLabel("Tot size ml"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
+                        }
+                        OutlinedTextField(value = totPrice, onValueChange = { totPrice = it }, label = requiredLabel("Price per tot ($currency)"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), singleLine = true, isError = !isTotValid)
+                    }
+
                     Text(
                         "Already have stock on hand? Record it so day-1 has a real cost instead of a guess.",
                         fontSize = 11.sp,
@@ -466,7 +495,11 @@ fun ItemManagementScreen(
                                 itemUnitType.trim(),
                                 itemDesc.trim(),
                                 openingQtyVal ?: 0,
-                                openingCostVal ?: 0.0
+                                openingCostVal ?: 0.0,
+                                totEnabled,
+                                bottleMlVal,
+                                totMlVal,
+                                totPriceVal
                             )
                             showAddItemDialog = false
                             itemName = ""
@@ -492,7 +525,11 @@ fun ItemManagementScreen(
         val isNameValid = itemName.trim().isNotBlank()
         val isPriceValid = uPriceVal != null && uPriceVal > 0.0
         val isUnitValid = itemUnitType.trim().isNotBlank()
-        val isFormValid = isNameValid && isPriceValid && isUnitValid
+        val bottleMlVal = bottleVolumeMl.toIntOrNull() ?: 0
+        val totMlVal = totSizeMl.toIntOrNull() ?: 0
+        val totPriceVal = totPrice.toDoubleOrNull() ?: 0.0
+        val isTotValid = !totEnabled || (bottleMlVal > 0 && totMlVal > 0 && totMlVal <= bottleMlVal && totPriceVal > 0.0)
+        val isFormValid = isNameValid && isPriceValid && isUnitValid && isTotValid
 
         AlertDialog(
             onDismissRequest = { editingItem = null },
@@ -546,6 +583,17 @@ fun ItemManagementScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Enable sale by tot", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Switch(checked = totEnabled, onCheckedChange = { totEnabled = it })
+                    }
+                    if (totEnabled) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = bottleVolumeMl, onValueChange = { bottleVolumeMl = it }, label = requiredLabel("Bottle ml"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
+                            OutlinedTextField(value = totSizeMl, onValueChange = { totSizeMl = it }, label = requiredLabel("Tot size ml"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f), singleLine = true)
+                        }
+                        OutlinedTextField(value = totPrice, onValueChange = { totPrice = it }, label = requiredLabel("Price per tot ($currency)"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(), singleLine = true, isError = !isTotValid)
+                    }
                 }
             },
             confirmButton = {
@@ -567,7 +615,7 @@ fun ItemManagementScreen(
                             val uPrice = itemUnitPrice.toDoubleOrNull() ?: 0.0
                             val cPrice = itemCasePrice.toDoubleOrNull() ?: 0.0
                             if (isFormValid) {
-                                onUpdateItem(targetItem.id, itemName.trim(), itemCategory, uPrice, cPrice, itemUnitType.trim(), itemDesc.trim())
+                                onUpdateItem(targetItem.id, itemName.trim(), itemCategory, uPrice, cPrice, itemUnitType.trim(), itemDesc.trim(), totEnabled, bottleMlVal, totMlVal, totPriceVal)
                                 editingItem = null
                             }
                         },
