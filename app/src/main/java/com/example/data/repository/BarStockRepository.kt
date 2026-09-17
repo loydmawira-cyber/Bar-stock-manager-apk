@@ -1243,17 +1243,54 @@ class BarStockRepository(private val dao: BarStockDao) {
             throw IllegalArgumentException("Password does not meet requirements: ${validation.missingRequirementsMessage}")
         }
         val finalEmail = email.ifBlank { "${name.lowercase().replace(" ", "")}@thebar.com" }.trim()
+        val pass = initialPassword.trim()
         val existingByEmail = dao.getUserByIdentifier(finalEmail)
         if (existingByEmail != null) {
             throw IllegalArgumentException("The email address '$finalEmail' is already registered to an account.")
         }
+        if (phone.isNotBlank()) {
+            val existingByPhone = dao.getUserByIdentifier(phone.trim())
+            if (existingByPhone != null) {
+                throw IllegalArgumentException("The phone number '${phone.trim()}' is already registered to an account.")
+            }
+        }
+
+        // Firebase signs the current device into the newly created account.
+        // Save the owner session so creating a manager does not log the owner out.
+        val auth = FirebaseAuth.getInstance()
+        val ownerEmail = auth.currentUser?.email
+        val ownerPassword = ownerEmail?.let { dao.getUserByEmail(it)?.password }
+
+        try {
+            if (android.util.Patterns.EMAIL_ADDRESS.matcher(finalEmail).matches()) {
+                FirebaseAuth.getInstance().createUserWithEmailAndPassword(finalEmail, pass).await()
+            }
+        } catch (e: com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+            throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+        } catch (e: com.google.firebase.auth.FirebaseAuthException) {
+            if (e.errorCode == "ERROR_EMAIL_ALREADY_IN_USE" || e.message?.contains("already in use", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            } else {
+                throw IllegalArgumentException(e.localizedMessage ?: "Failed to create account.")
+            }
+        } catch (e: Exception) {
+            if (e.message?.contains("already in use", ignoreCase = true) == true ||
+                e.message?.contains("EMAIL_EXISTS", ignoreCase = true) == true) {
+                throw IllegalArgumentException("The email address '$finalEmail' is already in use by an existing account.")
+            }
+        }
+
+        if (!ownerEmail.isNullOrBlank() && !ownerPassword.isNullOrBlank()) {
+            auth.signInWithEmailAndPassword(ownerEmail, ownerPassword).await()
+        }
+
         val user = User(
             name = name.trim(),
             role = UserRole.MANAGER,
             status = UserStatus.APPROVED,
             email = finalEmail,
             phone = phone.trim(),
-            password = initialPassword.trim()
+            password = pass
         )
         return dao.insertUser(user)
     }
