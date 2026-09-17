@@ -53,6 +53,7 @@ import com.example.ui.screens.DisputeManagementScreen
 import com.example.ui.screens.ItemManagementScreen
 import com.example.ui.screens.LedgerScreen
 import com.example.ui.screens.NotificationsScreen
+import com.example.ui.screens.MonthlyReportsScreen
 import com.example.ui.screens.ShiftEndClosingScreen
 import com.example.ui.screens.ShiftStartVerificationScreen
 import com.example.ui.screens.ShiftSummaryScreen
@@ -146,6 +147,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val billingStatus by viewModel.billingStatus.collectAsState()
     val availableBillingPlans by viewModel.availableBillingPlans.collectAsState()
     val billingConnectionState by viewModel.billingConnectionState.collectAsState()
+    val monthlyReports by viewModel.monthlyReports.collectAsState()
+    val monthlyReportsLoading by viewModel.monthlyReportsLoading.collectAsState()
 
     var showPasswordDialog by remember { mutableStateOf(false) }
     var attendantDashboardTab by remember { mutableStateOf(AttendantDashboardTab.OVERVIEW) }
@@ -179,6 +182,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
             AppScreen.USERS_MANAGEMENT -> if (currentUser?.role == UserRole.OWNER) "User Hierarchy" else "Attendant Logins"
             AppScreen.EXPENSES_MANAGEMENT -> "Expense Management"
             AppScreen.PROFIT_LOSS_REPORT -> "P&L Statement"
+            AppScreen.MONTHLY_REPORTS -> "Monthly Reports"
             AppScreen.NOTIFICATIONS -> "Notification Center"
         }
 
@@ -613,6 +617,19 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         LaunchedEffect(Unit) {
                             viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD)
                         }
+                    }
+                }
+
+                AppScreen.MONTHLY_REPORTS -> {
+                    if (currentUser?.role == UserRole.OWNER) {
+                        MonthlyReportsScreen(
+                            reports = monthlyReports,
+                            loading = monthlyReportsLoading,
+                            onLoad = { viewModel.loadMonthlyReports() },
+                            onBack = { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
+                        )
+                    } else {
+                        LaunchedEffect(Unit) { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
                     }
                 }
 
