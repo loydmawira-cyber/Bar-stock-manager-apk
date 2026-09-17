@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
@@ -56,9 +58,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -131,6 +136,7 @@ fun AdminDashboardScreen(
     shifts: List<Shift>,
     currentUserRole: com.example.data.model.UserRole = com.example.data.model.UserRole.OWNER,
     storeStock: List<StoreStockWithItem> = emptyList(),
+    counterStockQuantities: Map<Long, Int> = emptyMap(),
     shiftClosings: List<ShiftClosing> = emptyList(),
     disputes: List<Dispute>,
     pendingUsers: List<User>,
@@ -142,6 +148,8 @@ fun AdminDashboardScreen(
     onAddStockAdjustment: (counterId: Long, itemId: Long, qty: Int, reason: String) -> Unit,
     onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     onSelectCounterForManagement: (Long) -> Unit
+    ,onUpdateCounter: (counterId: Long, name: String, location: String) -> Unit = { _, _, _ -> },
+    onDeleteCounter: (counterId: Long, destinationCounterId: Long?) -> Unit = { _, _ -> }
 ) {
     var showRestockDialog by remember { mutableStateOf(false) }
     var restockSource by remember { mutableStateOf("STORE") }
@@ -156,6 +164,12 @@ fun AdminDashboardScreen(
     var restockPurchaseUnit by remember { mutableStateOf("Crate") }
     var restockUnitsPerPurchaseUnit by remember { mutableStateOf("24") }
     var expandedPurchaseUnit by remember { mutableStateOf(false) }
+    var managementMenuCounterId by remember { mutableStateOf<Long?>(null) }
+    var editingCounter by remember { mutableStateOf<Counter?>(null) }
+    var deletingCounter by remember { mutableStateOf<Counter?>(null) }
+    var deleteDestinationCounterId by remember { mutableStateOf<Long?>(null) }
+    var editName by remember { mutableStateOf("") }
+    var editLocation by remember { mutableStateOf("") }
     val activeShiftsCount = counters.count { it.activeAttendantId != null }
     val openDisputesCount = disputes.count { it.status == com.example.data.model.DisputeStatus.OPEN }
     val pendingApprovalsCount = pendingUsers.size
@@ -518,18 +532,41 @@ fun AdminDashboardScreen(
                             }
                         }
 
-                        if (isActive) {
-                            StatusBadge(
-                                text = "On Duty: ${counter.activeAttendantName ?: "Attendant"}",
-                                containerColor = Color(0xFF0C4A6E),
-                                contentColor = SkyBlue
-                            )
-                        } else {
-                            StatusBadge(
-                                text = "Counter Available",
-                                containerColor = Color(0xFF064E3B),
-                                contentColor = EmeraldGreen
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isActive) {
+                                StatusBadge(
+                                    text = "On Duty: ${counter.activeAttendantName ?: "Attendant"}",
+                                    containerColor = Color(0xFF0C4A6E),
+                                    contentColor = SkyBlue
+                                )
+                            } else {
+                                StatusBadge(
+                                    text = "Counter Available",
+                                    containerColor = Color(0xFF064E3B),
+                                    contentColor = EmeraldGreen
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = { managementMenuCounterId = counter.id }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "Manage ${counter.name}")
+                                }
+                                DropdownMenu(
+                                    expanded = managementMenuCounterId == counter.id,
+                                    onDismissRequest = { managementMenuCounterId = null }
+                                ) {
+                                    DropdownMenuItem(text = { Text("Edit Counter") }, onClick = {
+                                        editName = counter.name
+                                        editLocation = counter.location
+                                        editingCounter = counter
+                                        managementMenuCounterId = null
+                                    })
+                                    DropdownMenuItem(text = { Text("Delete Counter") }, onClick = {
+                                        deletingCounter = counter
+                                        deleteDestinationCounterId = null
+                                        managementMenuCounterId = null
+                                    })
+                                }
+                            }
                         }
                     }
 
@@ -829,6 +866,60 @@ fun AdminDashboardScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    editingCounter?.let { counter ->
+        val isNameValid = editName.trim().isNotBlank()
+        val isLocationValid = editLocation.trim().isNotBlank()
+        AlertDialog(
+            onDismissRequest = { editingCounter = null },
+            title = { Text("Edit Counter") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = editName, onValueChange = { editName = it }, label = requiredLabel("Counter name"), isError = !isNameValid, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = editLocation, onValueChange = { editLocation = it }, label = requiredLabel("Location"), isError = !isLocationValid, modifier = Modifier.fillMaxWidth())
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (isNameValid && isLocationValid) {
+                        onUpdateCounter(counter.id, editName.trim(), editLocation.trim())
+                        editingCounter = null
+                    }
+                }, enabled = isNameValid && isLocationValid) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { editingCounter = null }) { Text("Cancel") } }
+        )
+    }
+
+    deletingCounter?.let { counter ->
+        val stockQuantity = counterStockQuantities[counter.id] ?: 0
+        AlertDialog(
+            onDismissRequest = { deletingCounter = null },
+            title = { Text("Delete ${counter.name}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (stockQuantity <= 0) {
+                        Text("This counter has zero stock and can be deleted permanently.")
+                    } else {
+                        Text("This counter has $stockQuantity units in stock. Choose where to move the stock before deleting it.")
+                        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = deleteDestinationCounterId == null, onClick = { deleteDestinationCounterId = null }, label = { Text("Store") }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary))
+                            counters.filter { it.id != counter.id }.forEach { destination ->
+                                FilterChip(selected = deleteDestinationCounterId == destination.id, onClick = { deleteDestinationCounterId = destination.id }, label = { Text(destination.name) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AmberPrimary))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onDeleteCounter(counter.id, deleteDestinationCounterId)
+                    deletingCounter = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deletingCounter = null }) { Text("Cancel") } }
         )
     }
 }
