@@ -1204,18 +1204,38 @@ class BarStockViewModel(
         unitPrice: Double,
         casePrice: Double,
         unitType: String,
-        description: String = ""
+        description: String = "",
+        openingStockQuantity: Int = 0,
+        openingStockCostPerUnit: Double = 0.0
     ) {
         viewModelScope.launch {
             if (name.isBlank() || unitPrice <= 0) {
                 _toastMessage.emit("Please enter valid item details.")
                 return@launch
             }
-            repository.addItem(name, category, unitPrice, casePrice, unitType, description)
-            _toastMessage.emit("Stock item added.")
+            if (openingStockQuantity > 0 && openingStockCostPerUnit <= 0) {
+                _toastMessage.emit("Please enter the cost per unit for the opening stock.")
+                return@launch
+            }
+            repository.addItemWithOpeningStock(
+                name = name,
+                category = category,
+                unitPrice = unitPrice,
+                casePrice = casePrice,
+                unitType = unitType,
+                description = description,
+                openingStockQuantity = openingStockQuantity,
+                openingStockCostPerUnit = openingStockCostPerUnit,
+                receivedByUserId = currentUser.value?.id,
+                receivedByName = currentUser.value?.name ?: "Admin"
+            )
+            _toastMessage.emit(
+                if (openingStockQuantity > 0) "Stock item added with opening stock." else "Stock item added."
+            )
             autoBackup()
         }
     }
+
 
     fun updateStockItem(
         itemId: Long,
