@@ -135,6 +135,7 @@ fun ReceivePurchaseDialog(
 
     val costVal = cost.toDoubleOrNull()
     val isCostValid = costVal != null && costVal > 0.0
+    val costLabel = "Cost per $purchaseUnit"
 
     val isFormValid = isItemValid && isQtyValid && isPackValid && isSupplierValid && isReceiptValid && isCostValid
 
@@ -214,9 +215,13 @@ fun ReceivePurchaseDialog(
                 OutlinedTextField(
                     value = cost,
                     onValueChange = { cost = it },
-                    label = requiredLabel("Cost per purchase unit"),
+                    label = requiredLabel(costLabel),
                     isError = cost.isNotEmpty() && !isCostValid,
-                    supportingText = if (cost.isNotEmpty() && !isCostValid) { { Text("Cost must be > 0", color = CrimsonRed) } } else null,
+                    supportingText = if (cost.isNotEmpty() && !isCostValid) {
+                        { Text("Cost must be > 0", color = CrimsonRed) }
+                    } else {
+                        { Text("Enter the purchase price for one $purchaseUnit.", color = Color.LightGray) }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
