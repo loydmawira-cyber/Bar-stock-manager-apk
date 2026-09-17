@@ -61,10 +61,19 @@ import java.util.Locale
 @Composable
 fun ShiftEndClosingScreen(
     closingItems: List<ClosingCountState>,
+    paymentMethods: List<String>,
+    submittedPaymentInputs: Map<String, String>,
     submittedCashInput: String,
+    submittedMpesaInput: String,
+    submittedCardInput: String,
+    submittedBankInput: String,
     closingNotesInput: String,
     onUpdateClosingQty: (itemId: Long, count: Int, looseMl: Int) -> Unit,
+    onUpdatePayment: (method: String, value: String) -> Unit,
     onUpdateSubmittedCash: (String) -> Unit,
+    onUpdateSubmittedMpesa: (String) -> Unit,
+    onUpdateSubmittedCard: (String) -> Unit,
+    onUpdateSubmittedBank: (String) -> Unit,
     onUpdateNotes: (String) -> Unit,
     onSubmitClosing: () -> Unit
 ) {
@@ -72,8 +81,8 @@ fun ShiftEndClosingScreen(
     val totalExpected = closingItems.sumOf { it.expectedAmount }
     val totalUnitsSold = closingItems.sumOf { it.unitsSold }
 
-    val submittedCash = submittedCashInput.toDoubleOrNull() ?: 0.0
-    val variance = if (submittedCashInput.isNotBlank()) submittedCash - totalExpected else 0.0
+    val submittedTotal = paymentMethods.sumOf { submittedPaymentInputs[it]?.toDoubleOrNull() ?: 0.0 }
+    val variance = submittedTotal - totalExpected
 
     LazyColumn(
         modifier = Modifier
@@ -320,7 +329,7 @@ fun ShiftEndClosingScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             val cashVal = submittedCashInput.toDoubleOrNull()
-            val isCashValid = cashVal != null && cashVal >= 0.0
+            val isCashValid = paymentMethods.isNotEmpty() && paymentMethods.all { (submittedPaymentInputs[it]?.toDoubleOrNull() ?: -1.0) >= 0.0 }
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -329,38 +338,31 @@ fun ShiftEndClosingScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "CASH HANDOVER RECONCILIATION",
+                        text = "SALES SUBMISSION BY PAYMENT METHOD",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Enter the actual physical cash amount handed over to Admin.",
+                        text = "Enter bar sales collected through each payment method. No external account balance is required.",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    OutlinedTextField(
-                        value = submittedCashInput,
-                        onValueChange = onUpdateSubmittedCash,
-                        label = requiredLabel("Cash Amount Handed Over ($currency)"),
-                        isError = submittedCashInput.isNotEmpty() && !isCashValid,
-                        supportingText = if (submittedCashInput.isNotEmpty() && !isCashValid) {
-                            { Text("Enter a valid non-negative cash amount", color = CrimsonRed) }
-                        } else null,
-                        leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null, tint = AmberPrimary) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("submitted_cash_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberPrimary,
-                            focusedLabelColor = AmberPrimary
+                    paymentMethods.forEach { method ->
+                        OutlinedTextField(
+                            value = submittedPaymentInputs[method] ?: "0",
+                            onValueChange = { onUpdatePayment(method, it) },
+                            label = { Text("$method sales ($currency)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth().testTag("payment_${method.lowercase().replace(" ", "_")}"),
+                            singleLine = true
                         )
-                    )
-
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Total submitted sales: ${formatCurrency(submittedTotal)}", fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
@@ -373,7 +375,7 @@ fun ShiftEndClosingScreen(
                     )
 
                     // Realtime Variance Preview
-                    if (submittedCashInput.isNotBlank() && isCashValid) {
+                    if (isCashValid) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val (varBg, varColor, varTitle) = when {
@@ -422,7 +424,7 @@ fun ShiftEndClosingScreen(
 
         // Final Submit Button
         item {
-            val isCashValid = (submittedCashInput.toDoubleOrNull() ?: -1.0) >= 0.0 && submittedCashInput.trim().isNotBlank()
+            val isCashValid = paymentMethods.isNotEmpty() && paymentMethods.all { (submittedPaymentInputs[it]?.toDoubleOrNull() ?: -1.0) >= 0.0 }
             Button(
                 onClick = onSubmitClosing,
                 enabled = isCashValid,
