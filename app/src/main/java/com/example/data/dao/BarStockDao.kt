@@ -126,6 +126,9 @@ interface BarStockDao {
     // --- Counter Stocks ---
     @Query("SELECT * FROM counter_stocks")
     suspend fun getAllCounterStocksSync(): List<CounterStock>
+
+    @Query("SELECT * FROM counter_stocks")
+    fun getAllCounterStocks(): Flow<List<CounterStock>>
     
     @Query("""
         SELECT cs.id AS stockId, cs.counterId, cs.itemId, i.name AS itemName, 
