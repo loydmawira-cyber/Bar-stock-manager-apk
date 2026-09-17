@@ -63,7 +63,7 @@ fun ShiftEndClosingScreen(
     closingItems: List<ClosingCountState>,
     submittedCashInput: String,
     closingNotesInput: String,
-    onUpdateClosingQty: (itemId: Long, count: Int) -> Unit,
+    onUpdateClosingQty: (itemId: Long, count: Int, looseMl: Int) -> Unit,
     onUpdateSubmittedCash: (String) -> Unit,
     onUpdateNotes: (String) -> Unit,
     onSubmitClosing: () -> Unit
@@ -210,12 +210,12 @@ fun ShiftEndClosingScreen(
                                 horizontalAlignment = Alignment.End
                             ) {
                                 Text(
-                                    text = "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}",
+                                    text = if (item.totEnabled) "Opening: ${item.effectiveOpening} bottles" else "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}",
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "Base: ${item.effectiveOpening}",
+                                    text = if (item.totEnabled) "Base: ${item.effectiveOpening * item.bottleVolumeMl} ml" else "Base: ${item.effectiveOpening}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = AmberPrimary
@@ -235,14 +235,14 @@ fun ShiftEndClosingScreen(
                         // Closing input stepper
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Closing Count:",
+                                text = if (item.totEnabled) "Closing bottles:" else "Closing Count:",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(end = 8.dp)
                             )
 
                             IconButton(
-                                onClick = { onUpdateClosingQty(item.itemId, maxOf(0, item.closingQty - 1)) },
+                                onClick = { onUpdateClosingQty(item.itemId, maxOf(0, item.closingQty - 1), item.closingLooseMl) },
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
@@ -257,7 +257,7 @@ fun ShiftEndClosingScreen(
                                 value = "${item.closingQty}",
                                 onValueChange = { str ->
                                     val count = str.filter { it.isDigit() }.toIntOrNull() ?: 0
-                                    onUpdateClosingQty(item.itemId, count)
+                                    onUpdateClosingQty(item.itemId, count, item.closingLooseMl)
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
@@ -270,7 +270,7 @@ fun ShiftEndClosingScreen(
                             Spacer(modifier = Modifier.width(6.dp))
 
                             IconButton(
-                                onClick = { onUpdateClosingQty(item.itemId, item.closingQty + 1) },
+                                onClick = { onUpdateClosingQty(item.itemId, item.closingQty + 1, item.closingLooseMl) },
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
@@ -278,12 +278,27 @@ fun ShiftEndClosingScreen(
                             ) {
                                 Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
+
+                            if (item.totEnabled) {
+                                OutlinedTextField(
+                                    value = "${item.closingLooseMl}",
+                                    onValueChange = { value ->
+                                        val ml = value.filter { it.isDigit() }.toIntOrNull() ?: 0
+                                        onUpdateClosingQty(item.itemId, item.closingQty, ml)
+                                    },
+                                    label = { Text("ml") },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.width(78.dp),
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
+                                )
+                            }
                         }
 
                         // Computed Sold & Amount
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "Sold: ${item.unitsSold}",
+                                text = if (item.totEnabled) "Balance: ${item.closingQty} bottles ${item.closingLooseMl} ml" else "Sold: ${item.unitsSold}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AmberPrimary
