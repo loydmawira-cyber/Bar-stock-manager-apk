@@ -97,7 +97,7 @@ fun CounterManagementScreen(
     onDeleteCounter: (counterId: Long) -> Unit = {},
     onAssignItemToCounter: (counterId: Long, itemId: Long, initialQty: Int) -> Unit,
     onRestockClick: (Counter) -> Unit,
-    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onRestockCounterFromSource: (counterId: Long, itemId: Long, qty: Int, unitsPerPurchaseUnit: Int, purchaseUnitType: String, source: String, supplier: String, receiptNumber: String, unitCost: Double, reason: String) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
     showCounterSelector: Boolean = true
 ) {
     var showCreateCounterDialog by remember { mutableStateOf(false) }
@@ -121,6 +121,9 @@ fun CounterManagementScreen(
     var restockSupplier by remember { mutableStateOf("") }
     var restockReceiptNumber by remember { mutableStateOf("") }
     var restockUnitCost by remember { mutableStateOf("0") }
+    var restockPurchaseUnit by remember { mutableStateOf("Crate") }
+    var restockUnitsPerPurchaseUnit by remember { mutableStateOf("24") }
+    var expandedPurchaseUnit by remember { mutableStateOf(false) }
 
     val activeCounter = counters.firstOrNull { it.id == selectedCounterId } ?: counters.firstOrNull()
 
@@ -589,19 +592,22 @@ fun CounterManagementScreen(
         val existingStock = counterStocks.find { it.itemId == selectedItemForAssign?.id }
         val currentExistingQty = existingStock?.currentQuantity ?: 0
         val qtyToAdd = assignInitialQtyText.toIntOrNull() ?: 0
-        val projectedTotal = currentExistingQty + maxOf(0, qtyToAdd)
 
         val availableAtStore = storeStock.firstOrNull { it.itemId == selectedItemForAssign?.id }?.currentQuantity ?: 0
         val isItemValid = selectedItemForAssign != null
         val isQtyValid = qtyToAdd > 0
-        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && qtyToAdd <= availableAtStore)
+        val unitsPerPurchaseUnitVal = restockUnitsPerPurchaseUnit.toIntOrNull() ?: 0
+        val isPurchasePackValid = unitsPerPurchaseUnitVal > 0
+        val unitsToAdd = if (restockSource == "SUPPLIER") qtyToAdd * unitsPerPurchaseUnitVal else qtyToAdd
+        val projectedTotal = currentExistingQty + maxOf(0, unitsToAdd)
+        val isStoreQtyValid = restockSource != "STORE" || (availableAtStore > 0 && unitsToAdd <= availableAtStore)
 
         val isSupplierValid = restockSupplier.trim().isNotBlank()
         val isReceiptValid = restockReceiptNumber.trim().isNotBlank()
         val costVal = restockUnitCost.toDoubleOrNull()
         val isCostValid = costVal != null && costVal > 0.0
 
-        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid)
+        val isSupplierFormValid = restockSource != "SUPPLIER" || (isSupplierValid && isReceiptValid && isCostValid && isPurchasePackValid)
         val isFormValid = isItemValid && isQtyValid && isStoreQtyValid && isSupplierFormValid
 
         AlertDialog(
@@ -678,6 +684,37 @@ fun CounterManagementScreen(
                     }
 
                     if (restockSource == "SUPPLIER") {
+                        ExposedDropdownMenuBox(
+                            expanded = expandedPurchaseUnit,
+                            onExpandedChange = { expandedPurchaseUnit = it }
+                        ) {
+                            OutlinedTextField(
+                                value = restockPurchaseUnit,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = requiredLabel("Purchase Unit"),
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPurchaseUnit) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                            )
+                            ExposedDropdownMenu(expanded = expandedPurchaseUnit, onDismissRequest = { expandedPurchaseUnit = false }) {
+                                listOf("Crate", "Case", "Bottle", "Other").forEach { option ->
+                                    DropdownMenuItem(text = { Text(option) }, onClick = {
+                                        restockPurchaseUnit = option
+                                        restockUnitsPerPurchaseUnit = when (option) { "Crate" -> "24"; "Case" -> "6"; "Bottle", "Other" -> "1" }
+                                        expandedPurchaseUnit = false
+                                    })
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = restockUnitsPerPurchaseUnit,
+                            onValueChange = { restockUnitsPerPurchaseUnit = it },
+                            label = requiredLabel("Units per $restockPurchaseUnit"),
+                            isError = restockUnitsPerPurchaseUnit.isNotEmpty() && !isPurchasePackValid,
+                            supportingText = if (restockUnitsPerPurchaseUnit.isNotEmpty() && !isPurchasePackValid) { { Text("Must be > 0", color = CrimsonRed) } } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(), singleLine = true
+                        )
                         OutlinedTextField(
                             value = restockSupplier,
                             onValueChange = { restockSupplier = it },
@@ -699,12 +736,12 @@ fun CounterManagementScreen(
                         OutlinedTextField(
                             value = restockUnitCost,
                             onValueChange = { restockUnitCost = it },
-                            label = requiredLabel("Cost per unit"),
+                            label = requiredLabel("Cost per $restockPurchaseUnit"),
                             isError = restockUnitCost.isNotEmpty() && !isCostValid,
                             supportingText = if (restockUnitCost.isNotEmpty() && !isCostValid) {
                                 { Text("Cost must be > 0", color = CrimsonRed) }
                             } else {
-                                { Text("Cost per unit to create purchase receipt.") }
+                                { Text("Enter the purchase price for one $restockPurchaseUnit.") }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(),
@@ -751,8 +788,8 @@ fun CounterManagementScreen(
                     OutlinedTextField(
                         value = assignInitialQtyText,
                         onValueChange = { assignInitialQtyText = it },
-                        label = requiredLabel("Quantity to Add (+ Units)"),
-                        placeholder = { Text("e.g. 10 or 24") },
+                        label = requiredLabel(if (restockSource == "SUPPLIER") "Quantity purchased" else "Quantity to Add (+ Units)"),
+                        placeholder = { Text(if (restockSource == "SUPPLIER") "e.g. 1 or 2" else "e.g. 10 or 24") },
                         isError = hasQtyError,
                         supportingText = {
                             if (hasNoStoreStock) {
@@ -762,7 +799,7 @@ fun CounterManagementScreen(
                             } else if (assignInitialQtyText.isNotEmpty() && !isQtyValid) {
                                 Text("Quantity must be greater than 0", color = CrimsonRed)
                             } else {
-                                Text("Adjusts stock: $currentExistingQty existing + ${maxOf(0, qtyToAdd)} added = $projectedTotal total units")
+                                Text("Adjusts stock: $currentExistingQty existing + ${maxOf(0, unitsToAdd)} added = $projectedTotal total units")
                             }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -783,6 +820,8 @@ fun CounterManagementScreen(
                                 activeCounter.id,
                                 item.id,
                                 qty,
+                                if (restockSource == "SUPPLIER") unitsPerPurchaseUnitVal else 1,
+                                if (restockSource == "SUPPLIER") restockPurchaseUnit else item.unitType,
                                 restockSource,
                                 restockSupplier.trim(),
                                 restockReceiptNumber.trim(),
@@ -797,7 +836,7 @@ fun CounterManagementScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
                 ) {
                     Text(
-                        text = if (existingStock != null) "Add Stock ($currentExistingQty + $qtyToAdd = $projectedTotal)" else "Assign Stock ($qtyToAdd Units)",
+                        text = if (existingStock != null) "Add Stock ($currentExistingQty + $unitsToAdd = $projectedTotal)" else "Assign Stock ($unitsToAdd Units)",
                         color = Color.Black,
                         fontWeight = FontWeight.Bold
                     )
