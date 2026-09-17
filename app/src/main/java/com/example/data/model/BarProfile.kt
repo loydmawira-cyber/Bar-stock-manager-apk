@@ -14,6 +14,7 @@ data class BarProfile(
     val contactPhone: String = "+1 (555) 234-5678",
     val currencyCode: String = "USD",
     val currencySymbol: String = "$",
+    val paymentMethods: String = "Cash,M-Pesa,Card,Bank transfer",
     val managerName: String = "Alex Vance",
     val openingHours: String = "4:00 PM - 3:00 AM",
     val isRegistered: Boolean = true,
