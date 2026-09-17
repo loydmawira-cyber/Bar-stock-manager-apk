@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "668378120106",
+    "project_id": "bar-stock-manager-e404c",
+    "storage_bucket": "bar-stock-manager-e404c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668378120106:android:fc52e34af189cf6ca775d3",
+        "android_client_info": {
+          "package_name": "com.aistudio.barstock.qwxkrt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuz2gXh0DH8amiJar0EaRyBnDvB94HjO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
