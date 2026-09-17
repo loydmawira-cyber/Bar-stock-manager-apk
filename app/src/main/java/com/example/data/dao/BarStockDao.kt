@@ -200,6 +200,9 @@ interface BarStockDao {
     @Query("DELETE FROM purchase_receipts")
     suspend fun clearPurchaseReceipts()
 
+    @Query("DELETE FROM purchase_receipts WHERE id = :id")
+    suspend fun deletePurchaseReceipt(id: Long)
+
     // --- Daily Item Cost Snapshots (last-purchase-cost-in-effect, frozen per day) ---
     @Query("SELECT * FROM item_cost_snapshots WHERE itemId = :itemId AND dayStart <= :dayStart ORDER BY dayStart DESC LIMIT 1")
     suspend fun getCostSnapshotOnOrBefore(itemId: Long, dayStart: Long): com.example.data.model.ItemCostSnapshot?
