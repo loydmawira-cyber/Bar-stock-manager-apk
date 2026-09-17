@@ -12,6 +12,7 @@ import com.example.data.model.DisputeStatus
 import com.example.data.model.Expense
 import com.example.data.model.Item
 import com.example.data.model.ItemCategory
+import com.example.data.model.ItemCostSnapshot
 import com.example.data.model.NotificationType
 import com.example.data.model.Reconciliation
 import com.example.data.model.ReconciliationType
@@ -444,6 +445,42 @@ class BarStockRepository(private val dao: BarStockDao) {
                 description = description
             )
         )
+    }
+
+    /**
+     * Creates a new item and, if opening stock is supplied, immediately backs it
+     * with a real [PurchaseReceipt] (via [receivePurchaseToStore]) instead of
+     * leaving it to the live `casePrice` fallback. This gives day-1 stock a real,
+     * frozen daily cost snapshot right away, exactly like any later restock.
+     */
+    suspend fun addItemWithOpeningStock(
+        name: String,
+        category: ItemCategory,
+        unitPrice: Double,
+        casePrice: Double,
+        unitType: String,
+        description: String = "",
+        openingStockQuantity: Int = 0,
+        openingStockCostPerUnit: Double = 0.0,
+        receivedByUserId: Long? = null,
+        receivedByName: String = "Admin"
+    ): Long {
+        val itemId = addItem(name, category, unitPrice, casePrice, unitType, description)
+        if (openingStockQuantity > 0 && openingStockCostPerUnit > 0) {
+            receivePurchaseToStore(
+                itemId = itemId,
+                purchaseQuantity = openingStockQuantity,
+                unitsPerPurchaseUnit = 1,
+                purchaseUnitType = unitType,
+                supplierName = "Opening Stock",
+                receiptNumber = "OPENING-$itemId-${System.currentTimeMillis()}",
+                unitCost = openingStockCostPerUnit,
+                receivedByUserId = receivedByUserId,
+                receivedByName = receivedByName,
+                notes = "Initial opening stock recorded at item setup"
+            )
+        }
+        return itemId
     }
 
     suspend fun updateItem(item: Item) = dao.updateItem(item).also {  }
@@ -1175,14 +1212,95 @@ class BarStockRepository(private val dao: BarStockDao) {
     suspend fun addExpense(expense: Expense): Long = dao.insertExpense(expense)
     suspend fun deleteExpense(id: Long) = dao.deleteExpense(id)
 
-    // --- Weighted-Average Costing & Financials ---
-    suspend fun getWeightedAverageCost(itemId: Long): Double {
-        val receipts = dao.getAllPurchaseReceiptsSync().filter { it.itemId == itemId }
-        val totalCost = receipts.sumOf { it.totalCost }
-        val totalUnits = receipts.sumOf { it.unitsReceived }
-        if (totalUnits > 0) {
-            return totalCost / totalUnits
+    // --- Daily Costing (last-purchase-cost, frozen per calendar day) ---
+
+    private fun startOfDay(timestamp: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = timestamp
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    private fun nextDayStart(dayStart: Long): Long {
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = dayStart
+        cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        return cal.timeInMillis
+    }
+
+    /**
+     * The true cost per single stock unit (e.g. per bottle) for a receipt.
+     * [PurchaseReceipt.unitCost] is the cost per *purchase* unit (e.g. per
+     * case), so it must be spread across the stock units that case contained.
+     */
+    private fun perStockUnitCost(receipt: PurchaseReceipt): Double {
+        return if (receipt.unitsReceived > 0) receipt.totalCost / receipt.unitsReceived else 0.0
+    }
+
+    /** Most recent purchase receipt for [itemId] received on or before [dayStart], if any. */
+    private fun lastReceiptOnOrBefore(
+        dayStart: Long,
+        receiptsForItem: List<PurchaseReceipt>
+    ): PurchaseReceipt? {
+        val dayEndExclusive = nextDayStart(dayStart)
+        return receiptsForItem
+            .filter { it.purchaseDate < dayEndExclusive }
+            .maxByOrNull { it.purchaseDate }
+    }
+
+    /**
+     * Ensures a frozen cost-per-unit snapshot exists for [itemId] for every day
+     * from its first purchase receipt through today, backfilling any gap since
+     * the last time this ran. Days are never rewritten once created, so past
+     * reports keep the cost that was actually in effect back then.
+     */
+    suspend fun ensureDailyCostSnapshots(itemId: Long) {
+        val receiptsForItem = dao.getAllPurchaseReceiptsSync().filter { it.itemId == itemId }
+        if (receiptsForItem.isEmpty()) return // Nothing purchased yet; fallback price is used live.
+
+        val today = startOfDay(System.currentTimeMillis())
+        val earliestReceiptDay = startOfDay(receiptsForItem.minOf { it.purchaseDate })
+        val latestSnapshotDay = dao.getLatestSnapshotDay(itemId)
+
+        var day = when {
+            latestSnapshotDay == null -> earliestReceiptDay
+            latestSnapshotDay < today -> nextDayStart(latestSnapshotDay)
+            else -> return // Already up to date through today.
         }
+        if (day > today) return
+
+        val item = dao.getItemById(itemId) ?: return
+        val newSnapshots = mutableListOf<ItemCostSnapshot>()
+        while (day <= today) {
+            val receipt = lastReceiptOnOrBefore(day, receiptsForItem)
+            newSnapshots.add(
+                ItemCostSnapshot(
+                    itemId = itemId,
+                    dayStart = day,
+                    costPerUnit = receipt?.let { perStockUnitCost(it) } ?: item.casePrice,
+                    sourceReceiptId = receipt?.id
+                )
+            )
+            day = nextDayStart(day)
+        }
+        if (newSnapshots.isNotEmpty()) {
+            dao.upsertCostSnapshots(newSnapshots)
+        }
+    }
+
+    suspend fun ensureDailyCostSnapshotsForAllItems() {
+        dao.getAllItemsSync().forEach { ensureDailyCostSnapshots(it.id) }
+
+    }
+
+    /** The frozen cost per unit for [itemId] in effect on [asOfDate] (defaults to today). */
+    suspend fun getDailyCostForItem(itemId: Long, asOfDate: Long = System.currentTimeMillis()): Double {
+        ensureDailyCostSnapshots(itemId)
+        val dayStart = startOfDay(asOfDate)
+        dao.getCostSnapshotOnOrBefore(itemId, dayStart)?.let { return it.costPerUnit }
         val item = dao.getItemById(itemId) ?: return 0.0
         return item.casePrice
     }
@@ -1221,29 +1339,53 @@ class BarStockRepository(private val dao: BarStockDao) {
         val items = dao.getAllItemsSync()
         val allShifts = dao.getAllShiftsSync().filter { (it.endTime ?: it.startTime) in startDate..endDate }
         val matchingShiftIds = allShifts.map { it.id }.toSet()
+        val shiftDayById = allShifts.associate { it.id to startOfDay(it.endTime ?: it.startTime) }
         val allClosings = dao.getAllShiftClosingsSync().filter { it.shiftId in matchingShiftIds }
         val allExpensesList = dao.getAllExpensesSync().filter { it.date in startDate..endDate }
         val allReceipts = dao.getAllPurchaseReceiptsSync().filter { it.purchaseDate in startDate..endDate }
         val allStoreStocks = dao.getAllStoreStocksSync()
         val allCounterStocks = dao.getAllCounterStocksSync()
 
+        // Make sure every item's daily cost history is caught up before valuing anything.
+        ensureDailyCostSnapshotsForAllItems()
+        val today = startOfDay(System.currentTimeMillis())
+        val itemIdsWithAnyReceipt = dao.getAllPurchaseReceiptsSync().map { it.itemId }.toSet()
+        val costCache = mutableMapOf<Pair<Long, Long>, Double>()
+        suspend fun costOnDay(itemId: Long, dayStart: Long): Double {
+            val key = itemId to dayStart
+            costCache[key]?.let { return it }
+            val cost = dao.getCostSnapshotOnOrBefore(itemId, dayStart)?.costPerUnit
+                ?: (dao.getItemById(itemId)?.casePrice ?: 0.0)
+            costCache[key] = cost
+            return cost
+        }
+
         val itemProfitabilities = items.map { item ->
-            val wCost = getWeightedAverageCost(item.id)
             val itemClosings = allClosings.filter { it.itemId == item.id }
             val unitsSold = itemClosings.sumOf { it.unitsSold }
             val sellingPrice = item.unitPrice
             val salesRev = unitsSold * sellingPrice
-            val cogs = unitsSold * wCost
+            // Each shift's units are costed at that shift's own day-snapshot, so a
+            // price change partway through the period only affects units sold
+            // from that day onward, not the whole period retroactively.
+            val cogs = itemClosings.sumOf { closing ->
+                val day = shiftDayById[closing.shiftId] ?: today
+                closing.unitsSold * costOnDay(item.id, day)
+            }
+            val avgCostPerUnitSold = if (unitsSold > 0) cogs / unitsSold else costOnDay(item.id, today)
             val grossProfit = salesRev - cogs
-            val profitPerUnit = sellingPrice - wCost
+            val profitPerUnit = sellingPrice - avgCostPerUnitSold
             val profitMarginPct = if (sellingPrice > 0) (profitPerUnit / sellingPrice) * 100.0 else 0.0
             val isLoss = profitPerUnit < 0 || grossProfit < 0
+            // No purchase receipt on file at all yet for this item means every
+            // cost used above is the live casePrice guess, not a real snapshot.
+            val costIsEstimated = item.id !in itemIdsWithAnyReceipt
 
             com.example.data.model.ItemProfitability(
                 itemId = item.id,
                 itemName = item.name,
                 category = item.category,
-                weightedAvgCost = wCost,
+                weightedAvgCost = avgCostPerUnitSold,
                 sellingPrice = sellingPrice,
                 profitPerUnit = profitPerUnit,
                 profitMarginPct = profitMarginPct,
@@ -1251,7 +1393,8 @@ class BarStockRepository(private val dao: BarStockDao) {
                 salesRevenue = salesRev,
                 cogs = cogs,
                 grossProfit = grossProfit,
-                isLossMaking = isLoss
+                isLossMaking = isLoss,
+                costIsEstimated = costIsEstimated
             )
         }
 
@@ -1266,17 +1409,19 @@ class BarStockRepository(private val dao: BarStockDao) {
         val closingStockValue = items.sumOf { item ->
             val storeQty = allStoreStocks.firstOrNull { it.itemId == item.id }?.currentQuantity ?: 0
             val counterQty = allCounterStocks.filter { it.itemId == item.id }.sumOf { it.currentQuantity }
-            (storeQty + counterQty) * getWeightedAverageCost(item.id)
+            (storeQty + counterQty) * costOnDay(item.id, today)
         }
 
         val purchasesReceivedQty = allReceipts.sumOf { it.unitsReceived }
         val totalUnitsSoldInPeriod = itemProfitabilities.sumOf { it.unitsSold }
         val openingStockQty = maxOf(0, currentClosingStockQty + totalUnitsSoldInPeriod - purchasesReceivedQty)
+        val openingDay = startOfDay(startDate)
         val openingStockValue = items.sumOf { item ->
-            getWeightedAverageCost(item.id) * (openingStockQty.toDouble() / maxOf(1, items.size))
+            costOnDay(item.id, openingDay) * (openingStockQty.toDouble() / maxOf(1, items.size))
         }
 
         val lossMaking = itemProfitabilities.filter { it.isLossMaking }
+        val estimatedCostItems = itemProfitabilities.filter { it.costIsEstimated && it.unitsSold > 0 }
 
         return com.example.data.model.ProfitAndLossReport(
             timeframe = timeframe,
@@ -1294,7 +1439,8 @@ class BarStockRepository(private val dao: BarStockDao) {
             closingStockValue = closingStockValue,
             stockVarianceQty = 0,
             itemProfitabilities = itemProfitabilities,
-            lossMakingItems = lossMaking
+            lossMakingItems = lossMaking,
+            itemsWithEstimatedCost = estimatedCostItems
         )
     }
 }
