@@ -2,8 +2,10 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,9 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,7 +30,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -48,9 +57,10 @@ import com.example.ui.components.formatDateTime
 import com.example.ui.theme.AmberPrimary
 import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.DarkSurfaceVariant
 import java.util.Calendar
 
-private enum class PurchaseTimeFilter { TODAY, MONTH, YEAR }
+private enum class PurchaseTimeFilter { ALL_TIME, TODAY, MONTH, YEAR }
 
 @Composable
 fun PurchaseReceiptsScreen(
@@ -66,7 +76,7 @@ fun PurchaseReceiptsScreen(
     var receiptPendingDelete by remember { mutableStateOf<PurchaseReceipt?>(null) }
     var selectedDestination by remember { mutableStateOf("All") }
     var destinationExpanded by remember { mutableStateOf(false) }
-    var selectedTimeFilter by remember { mutableStateOf(PurchaseTimeFilter.TODAY) }
+    var selectedTimeFilter by remember { mutableStateOf(PurchaseTimeFilter.ALL_TIME) }
     var selectedMonth by remember { mutableStateOf(now.get(Calendar.MONTH)) }
     var selectedYear by remember { mutableStateOf(now.get(Calendar.YEAR)) }
     var monthExpanded by remember { mutableStateOf(false) }
@@ -87,6 +97,7 @@ fun PurchaseReceiptsScreen(
     fun matchesTime(receipt: PurchaseReceipt): Boolean {
         val receiptCal = Calendar.getInstance().apply { timeInMillis = receipt.purchaseDate }
         return when (selectedTimeFilter) {
+            PurchaseTimeFilter.ALL_TIME -> true
             PurchaseTimeFilter.TODAY -> {
                 val start = Calendar.getInstance().apply {
                     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
@@ -134,8 +145,8 @@ fun PurchaseReceiptsScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.weight(1f)) {
                         OutlinedButton(onClick = { destinationExpanded = true }, modifier = Modifier.fillMaxWidth()) {
                             Text(selectedDestination, fontSize = 11.sp)
                         }
@@ -148,32 +159,194 @@ fun PurchaseReceiptsScreen(
                             }
                         }
                     }
-                    OutlinedButton(onClick = { selectedTimeFilter = PurchaseTimeFilter.TODAY }, modifier = Modifier.weight(1f)) { Text("Today", fontSize = 11.sp) }
-                    Column(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(onClick = { selectedTimeFilter = PurchaseTimeFilter.MONTH; monthExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (selectedTimeFilter == PurchaseTimeFilter.MONTH) monthNames[selectedMonth] else "Month", fontSize = 11.sp)
-                        }
-                        DropdownMenu(expanded = monthExpanded, onDismissRequest = { monthExpanded = false }) {
-                            monthNames.forEachIndexed { index, month ->
-                                DropdownMenuItem(text = { Text(month) }, onClick = {
-                                    selectedMonth = index
-                                    selectedTimeFilter = PurchaseTimeFilter.MONTH
-                                    monthExpanded = false
-                                })
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // All Time
+                    FilterChip(
+                        selected = selectedTimeFilter == PurchaseTimeFilter.ALL_TIME,
+                        onClick = { selectedTimeFilter = PurchaseTimeFilter.ALL_TIME },
+                        label = { Text("All Time", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AmberPrimary,
+                            selectedLabelColor = Color.Black,
+                            containerColor = DarkSurfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
+                    // Today
+                    FilterChip(
+                        selected = selectedTimeFilter == PurchaseTimeFilter.TODAY,
+                        onClick = { selectedTimeFilter = PurchaseTimeFilter.TODAY },
+                        label = { Text("Today", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AmberPrimary,
+                            selectedLabelColor = Color.Black,
+                            containerColor = DarkSurfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
+                    // Select Month Dropdown Chip
+                    Box {
+                        val isMonthSelected = selectedTimeFilter == PurchaseTimeFilter.MONTH
+                        FilterChip(
+                            selected = isMonthSelected,
+                            onClick = { monthExpanded = true },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (isMonthSelected) "Month: ${monthNames[selectedMonth]}" else "Select Month",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isMonthSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowDropDown,
+                                        contentDescription = "Select Month",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AmberPrimary,
+                                selectedLabelColor = Color.Black,
+                                containerColor = DarkSurfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("purchase_filter_month_chip")
+                        )
+
+                        DropdownMenu(
+                            expanded = monthExpanded,
+                            onDismissRequest = { monthExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Text(
+                                text = "Select Month ($selectedYear)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberPrimary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+
+                            monthNames.forEachIndexed { index, monthName ->
+                                val isCurrent = index == selectedMonth && selectedTimeFilter == PurchaseTimeFilter.MONTH
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = monthName,
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isCurrent) AmberPrimary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (isCurrent) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Check,
+                                                    contentDescription = null,
+                                                    tint = AmberPrimary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedMonth = index
+                                        selectedTimeFilter = PurchaseTimeFilter.MONTH
+                                        monthExpanded = false
+                                    }
+                                )
                             }
                         }
                     }
-                    Column(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(onClick = { selectedTimeFilter = PurchaseTimeFilter.YEAR; yearExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (selectedTimeFilter == PurchaseTimeFilter.YEAR) selectedYear.toString() else "Year", fontSize = 11.sp)
-                        }
-                        DropdownMenu(expanded = yearExpanded, onDismissRequest = { yearExpanded = false }) {
+
+                    // Select Year Dropdown Chip
+                    Box {
+                        val isYearSelected = selectedTimeFilter == PurchaseTimeFilter.YEAR
+                        FilterChip(
+                            selected = isYearSelected,
+                            onClick = { yearExpanded = true },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (isYearSelected) "Year: $selectedYear" else "Select Year",
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isYearSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowDropDown,
+                                        contentDescription = "Select Year",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AmberPrimary,
+                                selectedLabelColor = Color.Black,
+                                containerColor = DarkSurfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("purchase_filter_year_chip")
+                        )
+
+                        DropdownMenu(
+                            expanded = yearExpanded,
+                            onDismissRequest = { yearExpanded = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Text(
+                                text = "Select Year",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberPrimary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+
                             availableYears.forEach { year ->
-                                DropdownMenuItem(text = { Text(year.toString()) }, onClick = {
-                                    selectedYear = year
-                                    selectedTimeFilter = PurchaseTimeFilter.YEAR
-                                    yearExpanded = false
-                                })
+                                val isCurrent = year == selectedYear && selectedTimeFilter == PurchaseTimeFilter.YEAR
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = year.toString(),
+                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isCurrent) AmberPrimary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (isCurrent) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Check,
+                                                    contentDescription = null,
+                                                    tint = AmberPrimary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        selectedYear = year
+                                        selectedTimeFilter = PurchaseTimeFilter.YEAR
+                                        yearExpanded = false
+                                    }
+                                )
                             }
                         }
                     }
