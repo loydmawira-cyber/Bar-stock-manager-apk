@@ -223,6 +223,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     currentScreen = currentScreen,
                     openDisputesCount = openDisputesCount,
                     pendingUsersCount = pendingUsersCount,
+                    isOwner = currentUser?.role == UserRole.OWNER,
                     onNavigate = { screen -> viewModel.navigateTo(screen) }
                 )
             } else if (currentUser?.role == UserRole.ATTENDANT && currentScreen == AppScreen.ATTENDANT_DASHBOARD) {
@@ -596,10 +597,17 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 }
 
                 AppScreen.PROFIT_LOSS_REPORT -> {
-                    ProfitAndLossScreen(
-                        viewModel = viewModel,
-                        onBack = { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
-                    )
+                    if (currentUser?.role == UserRole.OWNER) {
+                        ProfitAndLossScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
+                        )
+                    } else {
+                        // Managers should not see Profit & Loss — bounce back to the dashboard.
+                        LaunchedEffect(Unit) {
+                            viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD)
+                        }
+                    }
                 }
 
                 AppScreen.NOTIFICATIONS -> {
