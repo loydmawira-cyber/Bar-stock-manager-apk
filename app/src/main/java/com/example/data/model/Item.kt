@@ -20,5 +20,9 @@ data class Item(
     val unitPrice: Double,       // Selling price per single unit/bottle/shot
     val casePrice: Double,       // Total price per case / bottle equivalent
     val unitType: String,        // "Bottle", "Shot / Tot", "Can", "Glass"
-    val description: String = ""
+    val description: String = "",
+    val totEnabled: Boolean = false,
+    val bottleVolumeMl: Int = 0,
+    val totSizeMl: Int = 0,
+    val totPrice: Double = 0.0
 )
