@@ -137,6 +137,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val closingItems by viewModel.closingItems.collectAsState()
     val submittedCashInput by viewModel.submittedCashInput.collectAsState()
     val closingNotesInput by viewModel.closingNotesInput.collectAsState()
+    val submittedPaymentInputs by viewModel.submittedPaymentInputs.collectAsState()
     val lastClosedShift by viewModel.lastClosedShift.collectAsState()
     val lastShiftClosings by viewModel.lastShiftClosings.collectAsState()
     val activeShiftPendingAdjustments by viewModel.activeShiftPendingAdjustments.collectAsState()
@@ -340,8 +341,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onSimulateTrialActive = { viewModel.simulateTrialActive() },
                         onSimulateTrialExpired = { viewModel.simulateTrialExpired() },
                         onResetSubscription = { viewModel.resetSubscriptionToFree() },
-                        onSaveProfile = { name, location, icon, photo, phone, currency, manager, hours ->
-                            viewModel.updateBarProfile(name, location, icon, photo, phone, currency, manager, hours)
+                        onSaveProfile = { name, location, icon, photo, phone, currency, paymentMethods, manager, hours ->
+                            viewModel.updateBarProfile(name, location, icon, photo, phone, currency, paymentMethods, manager, hours)
                         },
                         onNavigate = { screen -> viewModel.navigateTo(screen) },
                         onChangePasswordClick = { showPasswordDialog = true }
@@ -416,14 +417,23 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 AppScreen.SHIFT_CLOSING -> {
                     ShiftEndClosingScreen(
                         closingItems = closingItems,
+                        paymentMethods = barProfile.paymentMethods.split(",").map { it.trim() }.filter { it.isNotBlank() },
+                        submittedPaymentInputs = submittedPaymentInputs,
                         submittedCashInput = submittedCashInput,
+                        submittedMpesaInput = viewModel.submittedMpesaInput.collectAsState().value,
+                        submittedCardInput = viewModel.submittedCardInput.collectAsState().value,
+                        submittedBankInput = viewModel.submittedBankInput.collectAsState().value,
                         closingNotesInput = closingNotesInput,
                         onUpdateClosingQty = { itemId, count, looseMl ->
                             viewModel.updateClosingQty(itemId, count, looseMl)
                         },
+                        onUpdatePayment = { method, value -> viewModel.updateSubmittedPayment(method, value) },
                         onUpdateSubmittedCash = { cash ->
                             viewModel.updateSubmittedCashInput(cash)
                         },
+                        onUpdateSubmittedMpesa = viewModel::updateSubmittedMpesaInput,
+                        onUpdateSubmittedCard = viewModel::updateSubmittedCardInput,
+                        onUpdateSubmittedBank = viewModel::updateSubmittedBankInput,
                         onUpdateNotes = { notes ->
                             viewModel.updateClosingNotes(notes)
                         },
