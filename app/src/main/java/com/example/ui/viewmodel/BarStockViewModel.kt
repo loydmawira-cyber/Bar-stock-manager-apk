@@ -1218,7 +1218,11 @@ class BarStockViewModel(
         unitType: String,
         description: String = "",
         openingStockQuantity: Int = 0,
-        openingStockCostPerUnit: Double = 0.0
+        openingStockCostPerUnit: Double = 0.0,
+        totEnabled: Boolean = false,
+        bottleVolumeMl: Int = 0,
+        totSizeMl: Int = 0,
+        totPrice: Double = 0.0
     ) {
         viewModelScope.launch {
             if (name.isBlank() || unitPrice <= 0) {
@@ -1238,6 +1242,10 @@ class BarStockViewModel(
                 description = description,
                 openingStockQuantity = openingStockQuantity,
                 openingStockCostPerUnit = openingStockCostPerUnit,
+                totEnabled = totEnabled,
+                bottleVolumeMl = bottleVolumeMl,
+                totSizeMl = totSizeMl,
+                totPrice = totPrice,
                 receivedByUserId = currentUser.value?.id,
                 receivedByName = currentUser.value?.name ?: "Admin"
             )
@@ -1256,7 +1264,11 @@ class BarStockViewModel(
         unitPrice: Double,
         casePrice: Double,
         unitType: String,
-        description: String = ""
+        description: String = "",
+        totEnabled: Boolean = false,
+        bottleVolumeMl: Int = 0,
+        totSizeMl: Int = 0,
+        totPrice: Double = 0.0
     ) {
         viewModelScope.launch {
             if (name.isBlank() || unitPrice <= 0) {
@@ -1271,7 +1283,11 @@ class BarStockViewModel(
                     unitPrice = unitPrice,
                     casePrice = casePrice,
                     unitType = unitType.trim().ifBlank { "Unit" },
-                    description = description.trim()
+                    description = description.trim(),
+                    totEnabled = totEnabled,
+                    bottleVolumeMl = bottleVolumeMl,
+                    totSizeMl = totSizeMl,
+                    totPrice = totPrice
                 )
             )
             _toastMessage.emit("Stock item '${name.trim()}' updated successfully.")
