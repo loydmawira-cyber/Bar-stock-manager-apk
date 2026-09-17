@@ -234,6 +234,14 @@ class BarStockViewModel(
         }
     }
 
+    fun deletePurchaseReceipt(id: Long) {
+        viewModelScope.launch {
+            repository.deletePurchaseReceipt(id)
+            autoBackup()
+            _toastMessage.emit("Purchase receipt deleted and stock reversed.")
+        }
+    }
+
     fun createManagerByOwner(name: String, email: String, phone: String, initialPassword: String) {
         viewModelScope.launch {
             if (name.isBlank() || email.isBlank() || phone.isBlank() || initialPassword.isBlank()) {
