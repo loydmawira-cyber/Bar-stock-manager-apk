@@ -79,7 +79,7 @@ import com.example.ui.theme.SkyBlue
 fun ItemManagementScreen(
     currentUser: User?,
     items: List<Item>,
-    onCreateItem: (name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String) -> Unit,
+    onCreateItem: (name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String, openingStockQuantity: Int, openingStockCostPerUnit: Double) -> Unit,
     onUpdateItem: (itemId: Long, name: String, category: ItemCategory, unitPrice: Double, casePrice: Double, unitType: String, description: String) -> Unit = { _, _, _, _, _, _, _ -> },
     onDeleteItem: (itemId: Long) -> Unit = {},
     onSyncData: () -> Unit = {}
@@ -95,6 +95,8 @@ fun ItemManagementScreen(
     var itemCasePrice by remember { mutableStateOf("120.00") }
     var itemUnitType by remember { mutableStateOf("Bottle") }
     var itemDesc by remember { mutableStateOf("") }
+    var openingStockQty by remember { mutableStateOf("") }
+    var openingStockCost by remember { mutableStateOf("") }
     var expandedCategoryMenu by remember { mutableStateOf(false) }
 
     fun openEditDialog(item: Item) {
@@ -200,6 +202,8 @@ fun ItemManagementScreen(
                             itemCasePrice = "120.00"
                             itemUnitType = "Bottle"
                             itemDesc = ""
+                            openingStockQty = ""
+                            openingStockCost = ""
                             showAddItemDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
@@ -315,7 +319,11 @@ fun ItemManagementScreen(
         val isNameValid = itemName.trim().isNotBlank()
         val isPriceValid = uPriceVal != null && uPriceVal > 0.0
         val isUnitValid = itemUnitType.trim().isNotBlank()
-        val isFormValid = isNameValid && isPriceValid && isUnitValid
+        val openingQtyVal = openingStockQty.toIntOrNull()
+        val openingCostVal = openingStockCost.toDoubleOrNull()
+        val hasOpeningQty = openingQtyVal != null && openingQtyVal > 0
+        val isOpeningStockValid = !hasOpeningQty || (openingCostVal != null && openingCostVal > 0.0)
+        val isFormValid = isNameValid && isPriceValid && isUnitValid && isOpeningStockValid
 
         AlertDialog(
             onDismissRequest = { showAddItemDialog = false },
@@ -409,6 +417,39 @@ fun ItemManagementScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
+                    Text(
+                        "Already have stock on hand? Record it so day-1 has a real cost instead of a guess.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = openingStockQty,
+                            onValueChange = { openingStockQty = it },
+                            label = optionalLabel("Opening Stock Qty"),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
+                        )
+
+                        OutlinedTextField(
+                            value = openingStockCost,
+                            onValueChange = { openingStockCost = it },
+                            label = optionalLabel("Cost per Unit ($currency)"),
+                            isError = hasOpeningQty && !isOpeningStockValid,
+                            supportingText = if (hasOpeningQty && !isOpeningStockValid) { { Text("Required if quantity is set", color = CrimsonRed) } } else null,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -417,9 +458,20 @@ fun ItemManagementScreen(
                         val uPrice = itemUnitPrice.toDoubleOrNull() ?: 0.0
                         val cPrice = itemCasePrice.toDoubleOrNull() ?: 0.0
                         if (isFormValid) {
-                            onCreateItem(itemName.trim(), itemCategory, uPrice, cPrice, itemUnitType.trim(), itemDesc.trim())
+                            onCreateItem(
+                                itemName.trim(),
+                                itemCategory,
+                                uPrice,
+                                cPrice,
+                                itemUnitType.trim(),
+                                itemDesc.trim(),
+                                openingQtyVal ?: 0,
+                                openingCostVal ?: 0.0
+                            )
                             showAddItemDialog = false
                             itemName = ""
+                            openingStockQty = ""
+                            openingStockCost = ""
                         }
                     },
                     enabled = isFormValid,

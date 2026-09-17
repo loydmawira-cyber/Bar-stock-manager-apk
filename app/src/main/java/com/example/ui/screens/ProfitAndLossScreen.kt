@@ -124,6 +124,41 @@ fun ProfitAndLossScreen(
                         }
                     }
 
+                    // Estimated Cost Alert Banner
+                    if (report.itemsWithEstimatedCost.isNotEmpty()) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = AmberPrimary.copy(alpha = 0.15f)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = AmberPrimary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Estimated Cost (${report.itemsWithEstimatedCost.size} items have no purchase receipt yet)",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AmberPrimary
+                                        )
+                                        Text(
+                                            text = "Using the manual case price as a guess, not an actual purchase, for: ${report.itemsWithEstimatedCost.joinToString { it.itemName }}. Record a purchase receipt (or opening stock) for accurate profit.",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Executive Financial Summary
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -293,6 +328,21 @@ fun ItemProfitabilityCard(item: ItemProfitability) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     CategoryBadge(category = item.category)
+                    if (item.costIsEstimated) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = AmberPrimary.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "Est. cost",
+                                color = AmberPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 if (item.isLossMaking) {
