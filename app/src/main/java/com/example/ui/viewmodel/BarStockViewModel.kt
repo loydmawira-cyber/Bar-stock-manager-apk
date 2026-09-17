@@ -145,6 +145,7 @@ class BarStockViewModel(
     val allReconciliations = repository.allReconciliations.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allStockAdjustments = repository.allStockAdjustments.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val storeStock = repository.getStoreStockWithItems().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allCounterStocks = repository.allCounterStocks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val purchaseReceipts = repository.allPurchaseReceipts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Notifications
@@ -1181,7 +1182,7 @@ class BarStockViewModel(
         }
     }
 
-    fun deleteCounter(counterId: Long) {
+    fun deleteCounter(counterId: Long, destinationCounterId: Long? = null) {
         viewModelScope.launch {
             val counter = repository.getCounterById(counterId)
             if (counter == null) return@launch
@@ -1189,13 +1190,14 @@ class BarStockViewModel(
                 _toastMessage.emit("Cannot delete '${counter.name}' while an attendant shift is active!")
                 return@launch
             }
-            repository.deleteCounter(counterId)
+            repository.deleteCounterAndMoveStock(counterId, destinationCounterId)
             if (_selectedCounterId.value == counterId) {
                 val remaining = allCounters.value.filter { it.id != counterId }
                 _selectedCounterId.value = remaining.firstOrNull()?.id
             }
             autoBackup()
-            _toastMessage.emit("Counter '${counter.name}' deleted.")
+            val destination = if (destinationCounterId == null) "Store" else allCounters.value.firstOrNull { it.id == destinationCounterId }?.name ?: "the selected counter"
+            _toastMessage.emit("Counter '${counter.name}' deleted. Stock moved to $destination.")
         }
     }
 
