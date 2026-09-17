@@ -305,24 +305,7 @@ fun CounterManagementScreen(
                         if (currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.MANAGER) {
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        selectedItemForAssign = allItems.firstOrNull()
-                                        showAssignItemDialog = true
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Filled.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Assign Item", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-
+                            Row(modifier = Modifier.fillMaxWidth()) {
                                 Button(
                                     onClick = {
                                         selectedItemForAssign = counterStocks.firstOrNull()?.let { s -> allItems.find { it.id == s.itemId } } ?: allItems.firstOrNull()
@@ -331,7 +314,7 @@ fun CounterManagementScreen(
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Filled.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -362,7 +345,7 @@ fun CounterManagementScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "No items assigned to this counter yet. Click 'Assign Item' to populate stock.",
+                            text = "No items assigned to this counter yet. Use 'Restock Units' to add stock.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp)
