@@ -17,5 +17,6 @@ data class ShiftClosing(
     val effectiveOpeningQty: Int = 0,   // openingQty + adjustmentsQty
     val closingQty: Int,
     val unitsSold: Int,                 // effectiveOpeningQty - closingQty
-    val expectedAmount: Double          // unitsSold * unitPrice
+    val expectedAmount: Double,         // unitsSold * unitPrice
+    val closingLooseMl: Int = 0
 )
