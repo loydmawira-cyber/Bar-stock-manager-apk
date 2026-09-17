@@ -12,6 +12,11 @@ data class Reconciliation(
     val counterName: String,
     val expectedTotal: Double,
     val submittedTotal: Double,
+    val submittedCash: Double = 0.0,
+    val submittedMpesa: Double = 0.0,
+    val submittedCard: Double = 0.0,
+    val submittedBank: Double = 0.0,
+    val submittedPaymentBreakdown: String = "",
     val variance: Double,                // submittedTotal - expectedTotal (<0: loss, >0: extra)
     val type: ReconciliationType,        // LOSS, EXTRA, BALANCED
     val date: Long = System.currentTimeMillis(),
