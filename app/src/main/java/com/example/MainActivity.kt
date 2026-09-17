@@ -414,8 +414,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         closingItems = closingItems,
                         submittedCashInput = submittedCashInput,
                         closingNotesInput = closingNotesInput,
-                        onUpdateClosingQty = { itemId, count ->
-                            viewModel.updateClosingQty(itemId, count)
+                        onUpdateClosingQty = { itemId, count, looseMl ->
+                            viewModel.updateClosingQty(itemId, count, looseMl)
                         },
                         onUpdateSubmittedCash = { cash ->
                             viewModel.updateSubmittedCashInput(cash)
