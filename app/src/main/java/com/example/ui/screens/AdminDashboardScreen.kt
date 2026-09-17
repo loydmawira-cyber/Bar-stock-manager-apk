@@ -418,6 +418,17 @@ fun AdminDashboardScreen(
                             }
 
                             OutlinedButton(
+                                onClick = { if (currentUserRole == com.example.data.model.UserRole.OWNER) onNavigate(AppScreen.MONTHLY_REPORTS) },
+                                enabled = currentUserRole == com.example.data.model.UserRole.OWNER,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.5.dp, AmberPrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("Reports", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            OutlinedButton(
                                 onClick = { onNavigate(AppScreen.BAR_PROFILE) },
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.5.dp, AmberPrimary),
