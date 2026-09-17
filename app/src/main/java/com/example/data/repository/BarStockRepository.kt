@@ -38,6 +38,17 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
 
 class BarStockRepository(private val dao: BarStockDao) {
+
+    companion object {
+        /**
+         * Sentinel [PurchaseReceipt.supplierName] used for internal store→counter
+         * stock movements (see [restockCounterFromSource]). These carry no real
+         * cost (the cost field isn't even shown to the user for them) and must
+         * never be treated as a cost-setting purchase event for daily snapshots.
+         */
+        const val INTERNAL_TRANSFER_SUPPLIER_NAME = "Store Transfer"
+    }
+
     
 
     // --- Bar Profile ---
@@ -840,7 +851,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         dao.insertPurchaseReceipt(
             PurchaseReceipt(
                 receiptNumber = receiptNumber.trim().ifBlank { "AUTO-${System.currentTimeMillis()}" },
-                supplierName = if (source == "STORE") "Store Transfer" else supplierName,
+                supplierName = if (source == "STORE") INTERNAL_TRANSFER_SUPPLIER_NAME else supplierName,
                 itemId = itemId,
                 itemName = item.name,
                 purchaseQuantity = quantity,
@@ -1258,7 +1269,10 @@ class BarStockRepository(private val dao: BarStockDao) {
      * reports keep the cost that was actually in effect back then.
      */
     suspend fun ensureDailyCostSnapshots(itemId: Long) {
-        val receiptsForItem = dao.getAllPurchaseReceiptsSync().filter { it.itemId == itemId }
+        // Internal store→counter transfers are stock movements, not purchases —
+        // they carry no real cost and must never override the true cost.
+        val receiptsForItem = dao.getAllPurchaseReceiptsSync()
+            .filter { it.itemId == itemId && it.supplierName != INTERNAL_TRANSFER_SUPPLIER_NAME }
         if (receiptsForItem.isEmpty()) return // Nothing purchased yet; fallback price is used live.
 
         val today = startOfDay(System.currentTimeMillis())
@@ -1342,14 +1356,17 @@ class BarStockRepository(private val dao: BarStockDao) {
         val shiftDayById = allShifts.associate { it.id to startOfDay(it.endTime ?: it.startTime) }
         val allClosings = dao.getAllShiftClosingsSync().filter { it.shiftId in matchingShiftIds }
         val allExpensesList = dao.getAllExpensesSync().filter { it.date in startDate..endDate }
-        val allReceipts = dao.getAllPurchaseReceiptsSync().filter { it.purchaseDate in startDate..endDate }
+        val allReceipts = dao.getAllPurchaseReceiptsSync()
+            .filter { it.purchaseDate in startDate..endDate && it.supplierName != INTERNAL_TRANSFER_SUPPLIER_NAME }
         val allStoreStocks = dao.getAllStoreStocksSync()
         val allCounterStocks = dao.getAllCounterStocksSync()
 
         // Make sure every item's daily cost history is caught up before valuing anything.
         ensureDailyCostSnapshotsForAllItems()
         val today = startOfDay(System.currentTimeMillis())
-        val itemIdsWithAnyReceipt = dao.getAllPurchaseReceiptsSync().map { it.itemId }.toSet()
+        val itemIdsWithAnyReceipt = dao.getAllPurchaseReceiptsSync()
+            .filter { it.supplierName != INTERNAL_TRANSFER_SUPPLIER_NAME }
+            .map { it.itemId }.toSet()
         val costCache = mutableMapOf<Pair<Long, Long>, Double>()
         suspend fun costOnDay(itemId: Long, dayStart: Long): Double {
             val key = itemId to dayStart
