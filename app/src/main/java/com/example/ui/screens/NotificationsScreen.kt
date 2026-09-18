@@ -44,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AppNotification
+import com.example.data.model.InventoryLoss
+import com.example.data.model.ShortageAcceptanceStatus
 import com.example.data.model.NotificationType
 import com.example.ui.components.formatDateTime
 import com.example.ui.theme.AmberPrimary
@@ -56,6 +58,7 @@ import com.example.ui.theme.SkyBlue
 @Composable
 fun NotificationsScreen(
     notifications: List<AppNotification>,
+    losses: List<InventoryLoss> = emptyList(),
     onMarkAsRead: (Long) -> Unit,
     onMarkAllAsRead: () -> Unit,
     onAcceptShortage: (Long) -> Unit = {},
@@ -67,6 +70,8 @@ fun NotificationsScreen(
 
     var rejectingLossId by remember { mutableStateOf<Long?>(null) }
     var rejectReasonText by remember { mutableStateOf("") }
+    // Losses the user has just acted on: their buttons are disabled immediately, before the database catches up.
+    var busyLossIds by remember { mutableStateOf(setOf<Long>()) }
 
     rejectingLossId?.let { lossId ->
         AlertDialog(
@@ -84,6 +89,7 @@ fun NotificationsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        busyLossIds = busyLossIds + lossId
                         onRejectShortage(lossId, rejectReasonText.trim())
                         rejectingLossId = null
                         rejectReasonText = ""
@@ -253,25 +259,60 @@ fun NotificationsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
-                                if (notif.type == NotificationType.SHORTAGE_REJECTED && notif.relatedId != null) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = { onPostShortage(notif.relatedId) }) {
-                                            Text("Post to Attendant", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                // Buttons follow the real status of the loss, so they disappear once it has been decided.
+                                val shortageLoss = notif.relatedId?.let { id -> losses.firstOrNull { it.id == id } }
+                                val shortageBusy = notif.relatedId != null && notif.relatedId in busyLossIds
+
+                                if (notif.type == NotificationType.SHORTAGE_REJECTED && shortageLoss != null) {
+                                    when (shortageLoss.acceptanceStatus) {
+                                        ShortageAcceptanceStatus.REJECTED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            TextButton(
+                                                enabled = !shortageBusy,
+                                                onClick = {
+                                                    busyLossIds = busyLossIds + shortageLoss.id
+                                                    onPostShortage(shortageLoss.id)
+                                                }
+                                            ) {
+                                                Text("Post to Attendant", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                            }
+                                            TextButton(
+                                                enabled = !shortageBusy,
+                                                onClick = {
+                                                    busyLossIds = busyLossIds + shortageLoss.id
+                                                    onWaiveShortage(shortageLoss.id)
+                                                }
+                                            ) {
+                                                Text("Waive", color = AmberPrimary, fontWeight = FontWeight.Bold)
+                                            }
                                         }
-                                        TextButton(onClick = { onWaiveShortage(notif.relatedId) }) {
-                                            Text("Waive", color = AmberPrimary, fontWeight = FontWeight.Bold)
-                                        }
+                                        ShortageAcceptanceStatus.ACCEPTED -> Text("Posted to the attendant's shift", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = EmeraldGreen)
+                                        ShortageAcceptanceStatus.WAIVED -> Text("Waived - nothing charged", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                                        ShortageAcceptanceStatus.PENDING -> Unit
                                     }
                                 }
 
-                                if (notif.type == NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED && notif.relatedId != null) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = { onAcceptShortage(notif.relatedId) }) {
-                                            Text("Accept Shortage", color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                if (notif.type == NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED && shortageLoss != null) {
+                                    when (shortageLoss.acceptanceStatus) {
+                                        ShortageAcceptanceStatus.PENDING -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            TextButton(
+                                                enabled = !shortageBusy,
+                                                onClick = {
+                                                    busyLossIds = busyLossIds + shortageLoss.id
+                                                    onAcceptShortage(shortageLoss.id)
+                                                }
+                                            ) {
+                                                Text("Accept Shortage", color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                            }
+                                            TextButton(
+                                                enabled = !shortageBusy,
+                                                onClick = { rejectingLossId = shortageLoss.id }
+                                            ) {
+                                                Text("Reject", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                            }
                                         }
-                                        TextButton(onClick = { rejectingLossId = notif.relatedId }) {
-                                            Text("Reject", color = CrimsonRed, fontWeight = FontWeight.Bold)
-                                        }
+                                        ShortageAcceptanceStatus.ACCEPTED -> Text("Accepted", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = EmeraldGreen)
+                                        ShortageAcceptanceStatus.REJECTED -> Text("Rejected - awaiting admin review", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                                        ShortageAcceptanceStatus.WAIVED -> Text("Waived by admin - nothing charged", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
                                     }
                                 }
                             }
