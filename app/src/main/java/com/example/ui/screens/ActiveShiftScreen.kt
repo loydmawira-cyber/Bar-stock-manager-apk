@@ -326,7 +326,11 @@ fun ActiveShiftScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "${stock.currentQuantity}",
+                                text = if (stock.looseMl > 0) {
+                                    "${stock.currentQuantity} bottles + ${stock.looseMl} ml"
+                                } else {
+                                    "${stock.currentQuantity} bottles"
+                                },
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AmberPrimary
