@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,6 +110,15 @@ fun ShiftStartVerificationScreen(
         if (currentIndex > items.lastIndex) currentIndex = items.lastIndex
         if (currentIndex < 0) currentIndex = 0
     }
+
+    // True right after the attendant confirms the count on the LAST item.
+    // There's no next item to advance to, so this just closes that item's
+    // count-entry panel and shows a "review complete" message instead of
+    // silently doing nothing. It resets whenever they move to a different
+    // item (e.g. via Previous), so re-visiting the last item shows its
+    // panel again if they want to re-check it.
+    var reviewComplete by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(currentIndex) { reviewComplete = false }
 
     val verifiedCount = items.count { it.verified }
     val disputedCount = items.count { it.verified && it.hasDiscrepancy() }
@@ -343,8 +353,34 @@ fun ShiftStartVerificationScreen(
                         }
                     }
 
+                    // Once the count is confirmed on the last item, close this item's
+                    // entry panel and let the attendant decide when to finish, instead
+                    // of jumping straight into starting the shift.
+                    AnimatedVisibility(visible = reviewComplete && currentIndex == items.lastIndex) {
+                        Surface(
+                            color = DarkSurfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Filled.Check, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Count confirmed. Review any item above, then tap \"Confirm & Start Shift\" below when ready.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
                     // Once disputed, capture the real physical count and confirm to move on.
-                    AnimatedVisibility(visible = currentItem.verified && hasDiscrepancy) {
+                    AnimatedVisibility(visible = currentItem.verified && hasDiscrepancy && !reviewComplete) {
                         Column(modifier = Modifier.padding(top = 14.dp)) {
                             Text(
                                 text = "Enter actual physical count on shelf:",
@@ -429,7 +465,13 @@ fun ShiftStartVerificationScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
-                                onClick = { if (currentIndex < items.lastIndex) currentIndex += 1 },
+                                onClick = {
+                                    if (currentIndex < items.lastIndex) {
+                                        currentIndex += 1
+                                    } else {
+                                        reviewComplete = true
+                                    }
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
