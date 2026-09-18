@@ -75,7 +75,8 @@ data class OpeningVerificationState(
     val systemLooseMl: Int = 0,
     val countedQty: Int,
     val countedLooseMl: Int = 0,
-    val isApproved: Boolean
+    val isApproved: Boolean,
+    val verified: Boolean = false
 )
 
 data class ClosingCountState(
@@ -944,7 +945,8 @@ class BarStockViewModel(
                         systemLooseMl = item.looseMl,
                         countedQty = item.currentQuantity,
                         countedLooseMl = item.looseMl,
-                        isApproved = true
+                        isApproved = true,
+                        verified = false
                     )
                 }
                 _currentScreen.value = AppScreen.SHIFT_VERIFICATION
@@ -955,7 +957,7 @@ class BarStockViewModel(
 
     fun updateVerificationItemApproval(itemId: Long, approved: Boolean) {
         _verificationItems.value = _verificationItems.value.map {
-            if (it.itemId == itemId) it.copy(isApproved = approved) else it
+            if (it.itemId == itemId) it.copy(isApproved = approved, verified = true) else it
         }
     }
 
