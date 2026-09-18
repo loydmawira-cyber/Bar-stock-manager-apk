@@ -92,10 +92,16 @@ data class ClosingCountState(
     val totPrice: Double = 0.0
 ) {
     val effectiveOpening: Int get() = openingQty + adjustmentQty
-    val unitsSold: Int get() = maxOf(0, effectiveOpening - closingQty)
     val closingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
     val openingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
     val volumeSoldMl: Int get() = maxOf(0, openingVolumeMl - closingVolumeMl)
+    // For TOT items, whole bottles sold must be derived from volume, not bottle-count subtraction.
+    // Example: 750 ml opened and 600 ml remains = 150 ml sold = 0 bottles + tots.
+    val unitsSold: Int get() = if (totEnabled && bottleVolumeMl > 0) {
+        volumeSoldMl / bottleVolumeMl
+    } else {
+        maxOf(0, effectiveOpening - closingQty)
+    }
     val expectedAmount: Double get() = if (totEnabled && bottleVolumeMl > 0) {
         val fullBottles = volumeSoldMl / bottleVolumeMl
         val remainderMl = volumeSoldMl % bottleVolumeMl
