@@ -128,6 +128,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val purchaseReceipts by viewModel.purchaseReceipts.collectAsState()
     val allExpenses by viewModel.allExpenses.collectAsState()
     val allDisputes by viewModel.allDisputes.collectAsState()
+    val allInventoryLosses by viewModel.allInventoryLosses.collectAsState()
     val allReconciliations by viewModel.allReconciliations.collectAsState()
     val notifications by viewModel.notifications.collectAsState()
 
@@ -647,6 +648,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                 AppScreen.NOTIFICATIONS -> {
                     NotificationsScreen(
                         notifications = notifications,
+                        losses = allInventoryLosses,
                         onMarkAsRead = { id ->
                             viewModel.markNotificationAsRead(id)
                         },
