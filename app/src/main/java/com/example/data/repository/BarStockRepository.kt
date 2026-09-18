@@ -740,7 +740,9 @@ class BarStockRepository(private val dao: BarStockDao) {
         val unitType: String,
         val unitPrice: Double,
         val systemQty: Int,
+        val systemLooseMl: Int = 0,
         val countedQty: Int,
+        val countedLooseMl: Int = 0,
         val isApproved: Boolean
     )
 
@@ -755,7 +757,7 @@ class BarStockRepository(private val dao: BarStockDao) {
 
         var disputeCount = 0
         verifications.forEach { item ->
-            if (!item.isApproved || item.countedQty != item.systemQty) {
+            if (!item.isApproved || item.countedQty != item.systemQty || item.countedLooseMl != item.systemLooseMl) {
                 disputeCount++
             }
         }
@@ -787,14 +789,16 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitType = item.unitType,
                 unitPrice = item.unitPrice,
                 systemQty = item.systemQty,
+                systemLooseMl = item.systemLooseMl,
                 attendantEnteredQty = item.countedQty,
+                attendantLooseMl = item.countedLooseMl,
                 status = if (isDisputed) VerificationStatus.DISPUTED else VerificationStatus.CONFIRMED
             )
         }
         dao.insertStockVerifications(verificationEntities)
 
         // 4. Create Dispute records & Push Notifications
-        verifications.filter { !it.isApproved || it.countedQty != it.systemQty }.forEach { disputedItem ->
+        verifications.filter { !it.isApproved || it.countedQty != it.systemQty || it.countedLooseMl != it.systemLooseMl }.forEach { disputedItem ->
             val disputeId = dao.insertDispute(
                 Dispute(
                     shiftId = shiftId,
@@ -1036,6 +1040,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val unitType: String,
         val unitPrice: Double,
         val openingQty: Int,
+        val openingLooseMl: Int = 0,
         val adjustmentQty: Int,
         val closingQty: Int,
         val closingLooseMl: Int = 0,
@@ -1045,7 +1050,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val totPrice: Double = 0.0
     ) {
         val effectiveOpening: Int = openingQty + adjustmentQty
-        val openingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
+        val openingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl + openingLooseMl else effectiveOpening
         val closingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
         val volumeSoldMl: Int = maxOf(0, openingVolumeMl - closingVolumeMl)
         val unitsSold: Int = if (totEnabled && bottleVolumeMl > 0) {
@@ -1074,6 +1079,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitType = ver.unitType,
                 unitPrice = ver.unitPrice,
                 openingQty = ver.attendantEnteredQty,
+                openingLooseMl = ver.attendantLooseMl,
                 adjustmentQty = netAdj,
                 closingQty = maxOf(0, ver.attendantEnteredQty + netAdj)
                 ,totEnabled = dao.getItemById(ver.itemId)?.totEnabled ?: false
@@ -1140,6 +1146,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitType = item.unitType,
                 unitPrice = item.unitPrice,
                 openingQty = item.openingQty,
+                openingLooseMl = item.openingLooseMl,
                 adjustmentsQty = item.adjustmentQty,
                 effectiveOpeningQty = effectiveOpening,
                 closingQty = item.closingQty,
