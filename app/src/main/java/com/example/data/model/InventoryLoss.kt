@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-enum class ShortageAcceptanceStatus { PENDING, ACCEPTED, REJECTED }
+enum class ShortageAcceptanceStatus { PENDING, ACCEPTED, REJECTED, WAIVED }
 
 @Entity(tableName = "inventory_losses", indices = [Index(value = ["disputeId"], unique = true)])
 data class InventoryLoss(
