@@ -971,6 +971,18 @@ class BarStockViewModel(
         }
     }
 
+    fun updateVerificationItemCountedLooseMl(itemId: Long, looseMl: Int) {
+        _verificationItems.value = _verificationItems.value.map {
+            if (it.itemId == itemId) {
+                val clamped = maxOf(0, looseMl)
+                it.copy(
+                    countedLooseMl = clamped,
+                    isApproved = it.countedQty == it.systemQty && clamped == it.systemLooseMl
+                )
+            } else it
+        }
+    }
+
     fun confirmOpeningStockAndStartShift() {
         val user = _currentUser.value ?: return
         val counter = _selectedCounterForShift.value ?: return
