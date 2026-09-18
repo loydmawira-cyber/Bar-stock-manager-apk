@@ -337,10 +337,6 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onLaunchPurchase = { activity, plan -> viewModel.launchBillingPurchase(activity, plan) },
                         onRestorePurchases = { viewModel.restoreBillingPurchases() },
                         onOpenSubscriptions = { activity -> viewModel.openGooglePlaySubscriptions(activity) },
-                        onActivateSandbox = { plan -> viewModel.activateSandboxBillingPlan(plan) },
-                        onSimulateTrialActive = { viewModel.simulateTrialActive() },
-                        onSimulateTrialExpired = { viewModel.simulateTrialExpired() },
-                        onResetSubscription = { viewModel.resetSubscriptionToFree() },
                         onSaveProfile = { name, location, icon, photo, phone, currency, paymentMethods, manager, hours ->
                             viewModel.updateBarProfile(name, location, icon, photo, phone, currency, paymentMethods, manager, hours)
                         },
