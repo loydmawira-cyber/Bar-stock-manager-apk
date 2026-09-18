@@ -296,7 +296,12 @@ fun ShiftSummaryScreen(
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("Opening", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${closing.openingQty}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(
+                                        text = if (closing.openingLooseMl > 0) "${closing.openingQty} btls + ${closing.openingLooseMl} ml" else "${closing.openingQty}",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
 
                                 if (closing.adjustmentsQty != 0) {
@@ -343,7 +348,7 @@ fun ShiftSummaryScreen(
                                     )
                                     Text(
                                         if (closing.bottleVolumeMl > 0) {
-                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl
+                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl + closing.openingLooseMl
                                             val closingMl = closing.closingQty * closing.bottleVolumeMl + closing.closingLooseMl
                                             "${maxOf(0, openingMl - closingMl)} ml"
                                         } else {
@@ -382,7 +387,7 @@ fun ShiftSummaryScreen(
                                     )
                                     Text(
                                         text = if (closing.bottleVolumeMl > 0) {
-                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl
+                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl + closing.openingLooseMl
                                             val closingMl = closing.closingQty * closing.bottleVolumeMl + closing.closingLooseMl
                                             "${maxOf(0, openingMl - closingMl)} ml sold via tots/full bottles"
                                         } else {
