@@ -1048,7 +1048,6 @@ class BarStockRepository(private val dao: BarStockDao) {
         val openingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
         val closingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
         val volumeSoldMl: Int = maxOf(0, openingVolumeMl - closingVolumeMl)
-        // For TOT items, whole bottles sold must be derived from volume, not bottle-count subtraction.
         val unitsSold: Int = if (totEnabled && bottleVolumeMl > 0) {
             volumeSoldMl / bottleVolumeMl
         } else {
@@ -1146,7 +1145,8 @@ class BarStockRepository(private val dao: BarStockDao) {
                 closingQty = item.closingQty,
                 unitsSold = unitsSold,
                 expectedAmount = expectedAmount,
-                closingLooseMl = item.closingLooseMl
+                closingLooseMl = item.closingLooseMl,
+                bottleVolumeMl = item.bottleVolumeMl
             )
         }
         dao.insertShiftClosings(closingEntities)
