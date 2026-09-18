@@ -1291,8 +1291,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val shift = dao.getShiftById(loss.shiftId) ?: return
         val accountable = shift.variance - loss.totalValue
         dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.ACCEPTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis()))
-        dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "
-Accepted shortage: ${loss.missingBottles} bottle(s), value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
+        dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "\nAccepted shortage: ${loss.missingBottles} bottle(s), value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
         dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_ACCEPTED, title = "Shortage Accepted", message = "$attendantName accepted a shortage of ${loss.missingBottles} bottle(s), value ${loss.totalValue}.", relatedId = loss.id))
     }
 
