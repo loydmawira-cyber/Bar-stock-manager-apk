@@ -13,6 +13,7 @@ data class ShiftClosing(
     val unitType: String,
     val unitPrice: Double,
     val openingQty: Int,
+    val openingLooseMl: Int = 0,
     val adjustmentsQty: Int = 0,        // Mid-shift confirmed stock added/removed
     val effectiveOpeningQty: Int = 0,   // openingQty + adjustmentsQty
     val closingQty: Int,
