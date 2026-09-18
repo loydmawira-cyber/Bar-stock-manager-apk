@@ -321,7 +321,16 @@ fun ShiftSummaryScreen(
                                 Text("-", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("Closing Left", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${closing.closingQty}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                                    Text(
+                                        text = if (closing.closingLooseMl > 0) {
+                                            "${closing.closingQty} btls + ${closing.closingLooseMl} ml"
+                                        } else {
+                                            "${closing.closingQty}"
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AmberPrimary
+                                    )
                                 }
 
                                 Text("=", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -356,7 +365,11 @@ fun ShiftSummaryScreen(
                                         letterSpacing = 0.5.sp
                                     )
                                     Text(
-                                        text = "${closing.unitsSold} sold × ${formatCurrency(closing.unitPrice)}",
+                                        text = if (closing.closingLooseMl > 0) {
+                                            "${closing.unitsSold} full bottles sold; closing balance includes ${closing.closingLooseMl} ml"
+                                        } else {
+                                            "${closing.unitsSold} sold × ${formatCurrency(closing.unitPrice)}"
+                                        },
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
