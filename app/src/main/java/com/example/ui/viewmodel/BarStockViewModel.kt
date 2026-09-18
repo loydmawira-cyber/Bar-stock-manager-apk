@@ -76,7 +76,8 @@ data class OpeningVerificationState(
     val countedQty: Int,
     val countedLooseMl: Int = 0,
     val isApproved: Boolean,
-    val verified: Boolean = false
+    val verified: Boolean = false,
+    val mlTracked: Boolean = false   // true only for tot-enabled items; ml is hidden otherwise
 )
 
 data class ClosingCountState(
@@ -935,6 +936,8 @@ class BarStockViewModel(
             val stocks = repository.getCounterStocksWithItems(counter.id)
             stocks.collect { stockList ->
                 _verificationItems.value = stockList.map { item ->
+                    val mlTracked = repository.isMlTracked(item.itemId)
+                    val looseMl = if (mlTracked) item.looseMl else 0
                     OpeningVerificationState(
                         itemId = item.itemId,
                         itemName = item.itemName,
@@ -942,11 +945,12 @@ class BarStockViewModel(
                         unitType = item.unitType,
                         unitPrice = item.unitPrice,
                         systemQty = item.currentQuantity,
-                        systemLooseMl = item.looseMl,
+                        systemLooseMl = looseMl,
                         countedQty = item.currentQuantity,
-                        countedLooseMl = item.looseMl,
+                        countedLooseMl = looseMl,
                         isApproved = true,
-                        verified = false
+                        verified = false,
+                        mlTracked = mlTracked
                     )
                 }
                 _currentScreen.value = AppScreen.SHIFT_VERIFICATION
@@ -1181,7 +1185,8 @@ class BarStockViewModel(
     fun resolveDispute(
         disputeId: Long,
         resolutionNotes: String,
-        adjustedStockQty: Int?
+        adjustedStockQty: Int?,
+        adjustedLooseMl: Int? = null
     ) {
         val admin = _currentUser.value ?: return
         viewModelScope.launch {
@@ -1189,7 +1194,8 @@ class BarStockViewModel(
                 disputeId = disputeId,
                 resolutionNotes = resolutionNotes,
                 adminName = admin.name,
-                adjustedStockQty = adjustedStockQty
+                adjustedStockQty = adjustedStockQty,
+                adjustedLooseMl = adjustedLooseMl
             )
             autoBackup()
             _toastMessage.emit("Dispute resolved successfully.")
