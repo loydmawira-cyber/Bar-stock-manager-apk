@@ -1361,6 +1361,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val accountable = shift.variance - loss.totalValue
         dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.ACCEPTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis()))
         dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "\nAccepted shortage: ${shortageLabel(loss.missingBottles, loss.missingLooseMl)}, value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
+        syncReconciliationForShift(loss.shiftId)
         dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_ACCEPTED, title = "Shortage Accepted", message = "$attendantName accepted a shortage of ${shortageLabel(loss.missingBottles, loss.missingLooseMl)}, value ${loss.totalValue}.", relatedId = loss.id))
         return true
     }
@@ -1376,6 +1377,28 @@ class BarStockRepository(private val dao: BarStockDao) {
         return true
     }
 
+    /**
+     * Keeps the Sales Receipts / Ledger record (Reconciliation) in step with the shift itself.
+     * Posting a shortage changes the shift's variance and type, so the ledger row must follow.
+     */
+    private suspend fun syncReconciliationForShift(shiftId: Long) {
+        val shift = dao.getShiftById(shiftId) ?: return
+        if (shift.inventoryShortageValue <= 0.0 || shift.reconciliationType == ReconciliationType.NONE) return
+        val rec = dao.getReconciliationForShift(shiftId) ?: return
+        if (rec.variance == shift.variance && rec.type == shift.reconciliationType) return
+        val shortage = Math.round(shift.inventoryShortageValue * 100.0) / 100.0
+        val marker = "Includes inventory shortage"
+        val notes = if (rec.notes.contains(marker)) rec.notes else "${rec.notes} | $marker of $shortage".trim()
+        dao.updateReconciliation(rec.copy(variance = shift.variance, type = shift.reconciliationType, notes = notes))
+    }
+
+    /** Repairs ledger rows for shortages that were posted before the ledger was kept in sync. Safe to run repeatedly. */
+    suspend fun syncPostedShortagesIntoLedger() {
+        shortageMutex.withLock {
+            dao.getAllReconciliationsSync().forEach { syncReconciliationForShift(it.shiftId) }
+        }
+    }
+
     /** Owner/Manager overrides an attendant's rejection: the shortage is posted to the attendant's shift. */
     suspend fun postRejectedShortage(lossId: Long, adminName: String): Boolean =
         shortageMutex.withLock { postRejectedShortageLocked(lossId, adminName) }
@@ -1388,6 +1411,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val label = shortageLabel(loss.missingBottles, loss.missingLooseMl)
         dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.ACCEPTED, acceptedAt = System.currentTimeMillis(), reason = "${loss.reason} | Posted by $adminName after attendant rejection"))
         dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "\nShortage posted by $adminName after rejection: $label, value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
+        syncReconciliationForShift(loss.shiftId)
         dao.insertNotification(AppNotification(targetUserId = shift.attendantId, targetRole = UserRole.ATTENDANT, type = NotificationType.SHORTAGE_ACCEPTED, title = "Shortage Posted by Admin", message = "$adminName reviewed your rejection and posted the shortage of $label (value ${loss.totalValue}) to your shift.", relatedId = loss.id))
         return true
     }
