@@ -11,6 +11,8 @@ import com.example.data.model.Dispute
 import com.example.data.model.DisputeStatus
 import com.example.data.model.Expense
 import com.example.data.model.Item
+import com.example.data.model.InventoryLoss
+import com.example.data.model.ShortageAcceptanceStatus
 import com.example.data.model.ItemCategory
 import com.example.data.model.ItemCostSnapshot
 import com.example.data.model.NotificationType
@@ -1266,56 +1268,44 @@ class BarStockRepository(private val dao: BarStockDao) {
     val openDisputes: Flow<List<Dispute>> = dao.getDisputesByStatus(DisputeStatus.OPEN)
     fun getDisputesForAttendant(attendantId: Long): Flow<List<Dispute>> = dao.getDisputesForAttendant(attendantId)
 
-    suspend fun resolveDispute(
-        disputeId: Long,
-        resolutionNotes: String,
-        adminName: String,
-        adjustedStockQty: Int?
-    ) {
+    suspend fun resolveDispute(disputeId: Long, resolutionNotes: String, adminName: String, adjustedStockQty: Int?) {
         val dispute = dao.getDisputeById(disputeId) ?: return
-        val updated = dispute.copy(
-            status = DisputeStatus.RESOLVED,
-            resolutionNotes = resolutionNotes,
-            resolvedByAdminName = adminName,
-            resolvedAt = System.currentTimeMillis(),
-            adjustedStockQty = adjustedStockQty
-        )
-        dao.updateDispute(updated)
-
-        // If admin adjusted the official stock quantity
-        if (adjustedStockQty != null && adjustedStockQty >= 0) {
-            dao.updateStockQuantity(dispute.counterId, dispute.itemId, adjustedStockQty)
+        if (dispute.status == DisputeStatus.RESOLVED) return
+        val confirmedQty = adjustedStockQty?.coerceAtLeast(0) ?: dispute.reportedQty
+        val previousShift = dao.getPreviousClosedShift(dispute.counterId, dispute.shiftId)
+        val item = dao.getItemById(dispute.itemId)
+        val missingBottles = maxOf(0, dispute.expectedQty - confirmedQty)
+        val unitValue = item?.unitPrice ?: 0.0
+        val shortageValue = missingBottles * unitValue
+        dao.updateDispute(dispute.copy(status = DisputeStatus.RESOLVED, resolutionNotes = resolutionNotes, resolvedByAdminName = adminName, resolvedAt = System.currentTimeMillis(), adjustedStockQty = confirmedQty))
+        if (adjustedStockQty != null) dao.updateStockQuantity(dispute.counterId, dispute.itemId, confirmedQty)
+        if (previousShift != null && item != null && missingBottles > 0) {
+            val lossId = dao.insertInventoryLoss(InventoryLoss(disputeId = dispute.id, shiftId = previousShift.id, counterId = dispute.counterId, counterName = dispute.counterName, itemId = dispute.itemId, itemName = dispute.itemName, missingBottles = missingBottles, bottleVolumeMl = item.bottleVolumeMl, unitValue = unitValue, totalValue = shortageValue, reason = "Pending attendant acceptance: expected ${dispute.expectedQty}, confirmed $confirmedQty", resolvedBy = adminName))
+            if (lossId != -1L) dao.insertNotification(AppNotification(targetUserId = previousShift.attendantId, targetRole = UserRole.ATTENDANT, type = NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED, title = "Shortage Acceptance Required", message = "A shortage of $missingBottles bottle(s) valued at $shortageValue was confirmed for your previous shift. Accept or reject it.", relatedId = lossId))
         }
+    }
 
-        // Notify Raised Attendant
-        dao.insertNotification(
-            AppNotification(
-                targetUserId = dispute.raisedByAttendantId,
-                targetRole = UserRole.ATTENDANT,
-                type = NotificationType.DISPUTE_RESOLVED,
-                title = "Dispute Resolved: ${dispute.itemName}",
-                message = "Admin $adminName resolved dispute on ${dispute.itemName} at ${dispute.counterName}. Notes: $resolutionNotes",
-                relatedId = disputeId
-            )
-        )
+    suspend fun acceptShortage(lossId: Long, attendantId: Long, attendantName: String) {
+        val loss = dao.getInventoryLossById(lossId) ?: return
+        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING || loss.shiftId <= 0) return
+        val shift = dao.getShiftById(loss.shiftId) ?: return
+        val accountable = shift.variance - loss.totalValue
+        dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.ACCEPTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis()))
+        dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "
+Accepted shortage: ${loss.missingBottles} bottle(s), value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
+        dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_ACCEPTED, title = "Shortage Accepted", message = "$attendantName accepted a shortage of ${loss.missingBottles} bottle(s), value ${loss.totalValue}.", relatedId = loss.id))
+    }
 
-        // Notify Previous Attendant if involved
-        dispute.involvesPreviousAttendantId?.let { prevId ->
-            dao.insertNotification(
-                AppNotification(
-                    targetUserId = prevId,
-                    targetRole = UserRole.ATTENDANT,
-                    type = NotificationType.DISPUTE_RESOLVED,
-                    title = "Dispute Resolved: ${dispute.itemName}",
-                    message = "Admin $adminName resolved dispute regarding ${dispute.itemName} at ${dispute.counterName}. Notes: $resolutionNotes",
-                    relatedId = disputeId
-                )
-            )
-        }
+    suspend fun rejectShortage(lossId: Long, attendantId: Long, attendantName: String, reason: String) {
+        val loss = dao.getInventoryLossById(lossId) ?: return
+        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING) return
+        dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.REJECTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis(), rejectionReason = reason))
+        dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_REJECTED, title = "Shortage Rejected", message = "$attendantName rejected the shortage for ${loss.itemName}. Reason: $reason", relatedId = loss.id))
     }
 
     // --- Losses & Extras Ledger ---
     val allReconciliations: Flow<List<Reconciliation>> = dao.getAllReconciliations()
+    val allInventoryLosses: Flow<List<InventoryLoss>> = dao.getAllInventoryLosses()
     fun getReconciliationsByAttendant(attendantId: Long): Flow<List<Reconciliation>> =
         dao.getReconciliationsByAttendant(attendantId)
     fun getReconciliationsByMonth(monthYear: String): Flow<List<Reconciliation>> =
