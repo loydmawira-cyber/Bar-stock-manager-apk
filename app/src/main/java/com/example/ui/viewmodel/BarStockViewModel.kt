@@ -131,6 +131,10 @@ class BarStockViewModel(
                 _toastMessage.emit(msg)
             }
         }
+        // One-off repair: make sure already-posted shortages are reflected in the Sales Receipts / Ledger totals.
+        viewModelScope.launch {
+            try { repository.syncPostedShortagesIntoLedger() } catch (e: Exception) { /* non-critical */ }
+        }
     }
 
     private val _currentScreen = MutableStateFlow(AppScreen.AUTH)
