@@ -18,7 +18,9 @@ data class StockVerification(
     val unitType: String,
     val unitPrice: Double,
     val systemQty: Int,
+    val systemLooseMl: Int = 0,
     val attendantEnteredQty: Int,
+    val attendantLooseMl: Int = 0,
     val status: VerificationStatus = VerificationStatus.CONFIRMED,
     val verifiedAt: Long = System.currentTimeMillis()
 )
