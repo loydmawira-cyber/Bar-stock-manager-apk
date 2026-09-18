@@ -322,7 +322,7 @@ fun ShiftSummaryScreen(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("Closing Left", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
-                                        text = if (closing.closingLooseMl > 0) {
+                                        text = if (closing.bottleVolumeMl > 0 && closing.closingLooseMl > 0) {
                                             "${closing.closingQty} btls + ${closing.closingLooseMl} ml"
                                         } else {
                                             "${closing.closingQty}"
@@ -335,8 +335,24 @@ fun ShiftSummaryScreen(
 
                                 Text("=", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Units Sold", fontSize = 10.sp, color = EmeraldGreen, fontWeight = FontWeight.Bold)
-                                    Text("${closing.unitsSold}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = EmeraldGreen)
+                                    Text(
+                                        if (closing.bottleVolumeMl > 0) "Volume Sold" else "Units Sold",
+                                        fontSize = 10.sp,
+                                        color = EmeraldGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        if (closing.bottleVolumeMl > 0) {
+                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl
+                                            val closingMl = closing.closingQty * closing.bottleVolumeMl + closing.closingLooseMl
+                                            "${maxOf(0, openingMl - closingMl)} ml"
+                                        } else {
+                                            "${closing.unitsSold}"
+                                        },
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = EmeraldGreen
+                                    )
                                 }
                             }
                         }
@@ -365,8 +381,10 @@ fun ShiftSummaryScreen(
                                         letterSpacing = 0.5.sp
                                     )
                                     Text(
-                                        text = if (closing.closingLooseMl > 0) {
-                                            "${closing.unitsSold} full bottles sold; closing balance includes ${closing.closingLooseMl} ml"
+                                        text = if (closing.bottleVolumeMl > 0) {
+                                            val openingMl = closing.effectiveOpeningQty * closing.bottleVolumeMl
+                                            val closingMl = closing.closingQty * closing.bottleVolumeMl + closing.closingLooseMl
+                                            "${maxOf(0, openingMl - closingMl)} ml sold via tots/full bottles"
                                         } else {
                                             "${closing.unitsSold} sold × ${formatCurrency(closing.unitPrice)}"
                                         },
