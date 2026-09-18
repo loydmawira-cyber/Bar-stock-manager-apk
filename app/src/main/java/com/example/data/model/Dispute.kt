@@ -28,5 +28,8 @@ data class Dispute(
     val resolvedByAdminName: String? = null,
     val resolvedAt: Long? = null,
     val adjustedStockQty: Int? = null,
+    val expectedLooseMl: Int = 0,        // loose ml the system expected on top of expectedQty bottles
+    val reportedLooseMl: Int = 0,        // loose ml the attendant counted on top of reportedQty bottles
+    val adjustedLooseMl: Int? = null,    // loose ml the admin confirmed on resolution
     val createdAt: Long = System.currentTimeMillis()
 )
