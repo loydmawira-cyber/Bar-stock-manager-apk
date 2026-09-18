@@ -91,10 +91,6 @@ fun BarProfileScreen(
     onLaunchPurchase: (Activity, BillingPlan) -> Unit = { _, _ -> },
     onRestorePurchases: () -> Unit = {},
     onOpenSubscriptions: (Activity) -> Unit = {},
-    onActivateSandbox: (BillingPlan) -> Unit = {},
-    onSimulateTrialActive: () -> Unit = {},
-    onSimulateTrialExpired: () -> Unit = {},
-    onResetSubscription: () -> Unit = {},
     onSaveProfile: (
         name: String,
         location: String,
@@ -580,10 +576,6 @@ fun BarProfileScreen(
                 onLaunchPurchase = onLaunchPurchase,
                 onRestorePurchases = onRestorePurchases,
                 onOpenSubscriptions = onOpenSubscriptions,
-                onActivateSandbox = onActivateSandbox,
-                onSimulateTrialActive = onSimulateTrialActive,
-                onSimulateTrialExpired = onSimulateTrialExpired,
-                onResetSubscription = onResetSubscription
             )
         }
 
