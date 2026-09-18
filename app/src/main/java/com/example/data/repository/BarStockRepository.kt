@@ -32,6 +32,8 @@ import com.example.data.model.UserStatus
 import com.example.data.model.VerificationStatus
 import com.example.data.util.PasswordValidator
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.map
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,6 +42,9 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
 
 class BarStockRepository(private val dao: BarStockDao) {
+
+    // Serialises shortage decisions so a double tap can never post the same loss twice.
+    private val shortageMutex = Mutex()
 
     companion object {
         /**
@@ -1345,25 +1350,37 @@ class BarStockRepository(private val dao: BarStockDao) {
         }
     }
 
-    suspend fun acceptShortage(lossId: Long, attendantId: Long, attendantName: String) {
-        val loss = dao.getInventoryLossById(lossId) ?: return
-        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING || loss.shiftId <= 0) return
-        val shift = dao.getShiftById(loss.shiftId) ?: return
+    /** Returns false when the shortage was already decided (or can't be found), so nothing is posted twice. */
+    suspend fun acceptShortage(lossId: Long, attendantId: Long, attendantName: String): Boolean =
+        shortageMutex.withLock { acceptShortageLocked(lossId, attendantId, attendantName) }
+
+    private suspend fun acceptShortageLocked(lossId: Long, attendantId: Long, attendantName: String): Boolean {
+        val loss = dao.getInventoryLossById(lossId) ?: return false
+        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING || loss.shiftId <= 0) return false
+        val shift = dao.getShiftById(loss.shiftId) ?: return false
         val accountable = shift.variance - loss.totalValue
         dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.ACCEPTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis()))
         dao.updateShift(shift.copy(inventoryShortageValue = shift.inventoryShortageValue + loss.totalValue, totalAccountableVariance = accountable, variance = accountable, reconciliationType = if (accountable < 0) ReconciliationType.LOSS else if (accountable > 0) ReconciliationType.EXTRA else ReconciliationType.BALANCED, notes = (shift.notes + "\nAccepted shortage: ${shortageLabel(loss.missingBottles, loss.missingLooseMl)}, value ${loss.totalValue}; dispute #${loss.disputeId}.").trim()))
         dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_ACCEPTED, title = "Shortage Accepted", message = "$attendantName accepted a shortage of ${shortageLabel(loss.missingBottles, loss.missingLooseMl)}, value ${loss.totalValue}.", relatedId = loss.id))
+        return true
     }
 
-    suspend fun rejectShortage(lossId: Long, attendantId: Long, attendantName: String, reason: String) {
-        val loss = dao.getInventoryLossById(lossId) ?: return
-        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING) return
+    suspend fun rejectShortage(lossId: Long, attendantId: Long, attendantName: String, reason: String): Boolean =
+        shortageMutex.withLock { rejectShortageLocked(lossId, attendantId, attendantName, reason) }
+
+    private suspend fun rejectShortageLocked(lossId: Long, attendantId: Long, attendantName: String, reason: String): Boolean {
+        val loss = dao.getInventoryLossById(lossId) ?: return false
+        if (loss.acceptanceStatus != ShortageAcceptanceStatus.PENDING) return false
         dao.updateInventoryLoss(loss.copy(acceptanceStatus = ShortageAcceptanceStatus.REJECTED, acceptedByAttendantId = attendantId, acceptedByAttendantName = attendantName, acceptedAt = System.currentTimeMillis(), rejectionReason = reason))
         dao.insertNotification(AppNotification(targetRole = UserRole.OWNER, type = NotificationType.SHORTAGE_REJECTED, title = "Shortage Rejected", message = "$attendantName rejected the shortage for ${loss.itemName}. Reason: $reason", relatedId = loss.id))
+        return true
     }
 
     /** Owner/Manager overrides an attendant's rejection: the shortage is posted to the attendant's shift. */
-    suspend fun postRejectedShortage(lossId: Long, adminName: String): Boolean {
+    suspend fun postRejectedShortage(lossId: Long, adminName: String): Boolean =
+        shortageMutex.withLock { postRejectedShortageLocked(lossId, adminName) }
+
+    private suspend fun postRejectedShortageLocked(lossId: Long, adminName: String): Boolean {
         val loss = dao.getInventoryLossById(lossId) ?: return false
         if (loss.acceptanceStatus != ShortageAcceptanceStatus.REJECTED || loss.shiftId <= 0) return false
         val shift = dao.getShiftById(loss.shiftId) ?: return false
@@ -1376,7 +1393,10 @@ class BarStockRepository(private val dao: BarStockDao) {
     }
 
     /** Owner/Manager accepts the attendant's rejection: the shortage is written off and nothing is posted. */
-    suspend fun waiveRejectedShortage(lossId: Long, adminName: String): Boolean {
+    suspend fun waiveRejectedShortage(lossId: Long, adminName: String): Boolean =
+        shortageMutex.withLock { waiveRejectedShortageLocked(lossId, adminName) }
+
+    private suspend fun waiveRejectedShortageLocked(lossId: Long, adminName: String): Boolean {
         val loss = dao.getInventoryLossById(lossId) ?: return false
         if (loss.acceptanceStatus != ShortageAcceptanceStatus.REJECTED) return false
         val shift = dao.getShiftById(loss.shiftId)
