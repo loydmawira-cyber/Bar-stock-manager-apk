@@ -1035,7 +1035,7 @@ class BarStockViewModel(
     fun disputeAdjustment(adjustment: StockAdjustment) {
         val user = _currentUser.value ?: return
         viewModelScope.launch {
-            repository.disputeStockAdjustment(adjustment, user.name)
+            repository.disputeStockAdjustment(adjustment, user.name, user.id)
             autoBackup()
             _toastMessage.emit("Adjustment discrepancy reported as dispute to Admin.")
         }
@@ -1183,10 +1183,6 @@ class BarStockViewModel(
     ) {
         val admin = _currentUser.value ?: return
         viewModelScope.launch {
-            if (resolutionNotes.isBlank()) {
-                _toastMessage.emit("Please enter resolution notes.")
-                return@launch
-            }
             repository.resolveDispute(
                 disputeId = disputeId,
                 resolutionNotes = resolutionNotes,
@@ -1206,6 +1202,31 @@ class BarStockViewModel(
     fun rejectShortage(lossId: Long, reason: String) {
         val user = _currentUser.value ?: return
         viewModelScope.launch { repository.rejectShortage(lossId, user.id, user.name, reason); autoBackup(); _toastMessage.emit("Shortage rejected and sent for Admin review.") }
+    }
+
+    private fun canDecideShortage(): UserRole? {
+        val role = _currentUser.value?.role
+        return if (role == UserRole.OWNER || role == UserRole.MANAGER) role else null
+    }
+
+    fun postRejectedShortage(lossId: Long) {
+        val user = _currentUser.value ?: return
+        if (canDecideShortage() == null) return
+        viewModelScope.launch {
+            val done = repository.postRejectedShortage(lossId, user.name)
+            if (done) autoBackup()
+            _toastMessage.emit(if (done) "Shortage posted to the attendant's shift." else "This shortage was already decided.")
+        }
+    }
+
+    fun waiveRejectedShortage(lossId: Long) {
+        val user = _currentUser.value ?: return
+        if (canDecideShortage() == null) return
+        viewModelScope.launch {
+            val done = repository.waiveRejectedShortage(lossId, user.name)
+            if (done) autoBackup()
+            _toastMessage.emit(if (done) "Shortage waived. Nothing will be charged." else "This shortage was already decided.")
+        }
     }
 
     // --- Admin Stock Adjustments (Restock) ---
