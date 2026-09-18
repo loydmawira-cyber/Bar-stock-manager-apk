@@ -72,7 +72,9 @@ data class OpeningVerificationState(
     val unitType: String,
     val unitPrice: Double,
     val systemQty: Int,
+    val systemLooseMl: Int = 0,
     val countedQty: Int,
+    val countedLooseMl: Int = 0,
     val isApproved: Boolean
 )
 
@@ -83,6 +85,7 @@ data class ClosingCountState(
     val unitType: String,
     val unitPrice: Double,
     val openingQty: Int,
+    val openingLooseMl: Int = 0,
     val adjustmentQty: Int,
     val closingQty: Int,
     val totEnabled: Boolean = false,
@@ -938,7 +941,9 @@ class BarStockViewModel(
                         unitType = item.unitType,
                         unitPrice = item.unitPrice,
                         systemQty = item.currentQuantity,
+                        systemLooseMl = item.looseMl,
                         countedQty = item.currentQuantity,
+                        countedLooseMl = item.looseMl,
                         isApproved = true
                     )
                 }
@@ -960,7 +965,7 @@ class BarStockViewModel(
                 val clamped = maxOf(0, count)
                 it.copy(
                     countedQty = clamped,
-                    isApproved = clamped == it.systemQty
+                    isApproved = clamped == it.systemQty && it.countedLooseMl == it.systemLooseMl
                 )
             } else it
         }
@@ -980,7 +985,9 @@ class BarStockViewModel(
                     unitType = item.unitType,
                     unitPrice = item.unitPrice,
                     systemQty = item.systemQty,
+                    systemLooseMl = item.systemLooseMl,
                     countedQty = item.countedQty,
+                    countedLooseMl = item.countedLooseMl,
                     isApproved = item.isApproved
                 )
             }
@@ -1035,6 +1042,7 @@ class BarStockViewModel(
                     unitType = input.unitType,
                     unitPrice = input.unitPrice,
                     openingQty = input.openingQty,
+                    openingLooseMl = input.openingLooseMl,
                     adjustmentQty = input.adjustmentQty,
                     closingQty = input.closingQty,
                     totEnabled = input.totEnabled,
@@ -1106,6 +1114,7 @@ class BarStockViewModel(
                     unitPrice = item.unitPrice,
                     openingQty = item.openingQty,
                     adjustmentQty = item.adjustmentQty,
+                    openingLooseMl = item.openingLooseMl,
                     closingQty = item.closingQty,
                     closingLooseMl = item.closingLooseMl,
                     totEnabled = item.totEnabled,
