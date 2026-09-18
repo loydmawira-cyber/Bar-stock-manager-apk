@@ -75,7 +75,7 @@ class UserRoleConverter {
         ItemCostSnapshot::class,
         InventoryLoss::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(UserRoleConverter::class)
@@ -97,6 +97,7 @@ abstract class BarStockDatabase : RoomDatabase() {
                     .addMigrations(MIGRATION_6_7)
                     .addMigrations(MIGRATION_7_8)
                     .addMigrations(MIGRATION_8_9)
+                    .addMigrations(MIGRATION_9_10)
                     .fallbackToDestructiveMigration()
                     .addCallback(BarStockDatabaseCallback(scope))
                     .build()
@@ -155,6 +156,33 @@ abstract class BarStockDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptedByAttendantName TEXT")
                 database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptedAt INTEGER")
                 database.execSQL("ALTER TABLE inventory_losses ADD COLUMN rejectionReason TEXT")
+            }
+        }
+
+        private val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE disputes ADD COLUMN expectedLooseMl INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE disputes ADD COLUMN reportedLooseMl INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE disputes ADD COLUMN adjustedLooseMl INTEGER")
+                // Loose ml is only tracked for tot-enabled items: stop the shift summary treating other items as ml-measured.
+                database.execSQL("UPDATE shift_closings SET bottleVolumeMl = 0 WHERE itemId IN (SELECT id FROM items WHERE totEnabled = 0)")
+                // Backfill existing opening-count disputes from the stock verification that raised them.
+                // Mid-shift adjustment disputes (reportedQty = 0, no previous attendant) are left at 0.
+                database.execSQL("""
+                    UPDATE disputes SET
+                        expectedLooseMl = COALESCE((SELECT v.systemLooseMl FROM stock_verifications v WHERE v.shiftId = disputes.shiftId AND v.itemId = disputes.itemId LIMIT 1), 0),
+                        reportedLooseMl = COALESCE((SELECT v.attendantLooseMl FROM stock_verifications v WHERE v.shiftId = disputes.shiftId AND v.itemId = disputes.itemId LIMIT 1), 0)
+                    WHERE resolutionNotes NOT LIKE 'Mid-shift adjustment%'
+                      AND NOT (reportedQty = 0 AND involvesPreviousAttendantId IS NULL)
+                      AND itemId IN (SELECT id FROM items WHERE totEnabled = 1 AND bottleVolumeMl > 0)
+                """.trimIndent())
+                database.execSQL("""
+                    UPDATE disputes SET adjustedLooseMl = reportedLooseMl
+                    WHERE status = 'RESOLVED' AND adjustedStockQty IS NOT NULL
+                      AND resolutionNotes NOT LIKE 'Mid-shift adjustment%'
+                      AND NOT (reportedQty = 0 AND involvesPreviousAttendantId IS NULL)
+                      AND itemId IN (SELECT id FROM items WHERE totEnabled = 1 AND bottleVolumeMl > 0)
+                """.trimIndent())
             }
         }
 
