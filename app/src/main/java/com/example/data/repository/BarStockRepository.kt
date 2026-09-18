@@ -1045,10 +1045,15 @@ class BarStockRepository(private val dao: BarStockDao) {
         val totPrice: Double = 0.0
     ) {
         val effectiveOpening: Int = openingQty + adjustmentQty
-        val unitsSold: Int = maxOf(0, effectiveOpening - closingQty)
         val openingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
         val closingVolumeMl: Int = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
         val volumeSoldMl: Int = maxOf(0, openingVolumeMl - closingVolumeMl)
+        // For TOT items, whole bottles sold must be derived from volume, not bottle-count subtraction.
+        val unitsSold: Int = if (totEnabled && bottleVolumeMl > 0) {
+            volumeSoldMl / bottleVolumeMl
+        } else {
+            maxOf(0, effectiveOpening - closingQty)
+        }
         val expectedAmount: Double = if (totEnabled && bottleVolumeMl > 0) {
             val fullBottlesSold = volumeSoldMl / bottleVolumeMl
             val looseMlSold = volumeSoldMl % bottleVolumeMl
