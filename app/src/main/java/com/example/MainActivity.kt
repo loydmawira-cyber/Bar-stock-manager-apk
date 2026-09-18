@@ -384,9 +384,6 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         onUpdateCountedQty = { itemId, count ->
                             viewModel.updateVerificationItemCountedQty(itemId, count)
                         },
-                        onUpdateCountedLooseMl = { itemId, looseMl ->
-                            viewModel.updateVerificationItemCountedLooseMl(itemId, looseMl)
-                        },
                         onConfirmAndStartShift = {
                             viewModel.confirmOpeningStockAndStartShift()
                         },
@@ -650,7 +647,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         },
                         onMarkAllAsRead = {
                             viewModel.markAllNotificationsAsRead()
-                        }
+                        },
+                        onAcceptShortage = { lossId -> viewModel.acceptShortage(lossId) },
+                        onRejectShortage = { lossId, reason -> viewModel.rejectShortage(lossId, reason) }
                     )
                 }
             }
