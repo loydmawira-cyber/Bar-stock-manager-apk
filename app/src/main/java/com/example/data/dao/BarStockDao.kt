@@ -368,6 +368,12 @@ interface BarStockDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReconciliation(reconciliation: Reconciliation): Long
 
+    @Query("SELECT * FROM reconciliations WHERE shiftId = :shiftId LIMIT 1")
+    suspend fun getReconciliationForShift(shiftId: Long): Reconciliation?
+
+    @Update
+    suspend fun updateReconciliation(reconciliation: Reconciliation)
+
     // --- Notifications ---
     @Query("SELECT * FROM app_notifications ORDER BY timestamp DESC")
     fun getAllNotifications(): Flow<List<AppNotification>>
