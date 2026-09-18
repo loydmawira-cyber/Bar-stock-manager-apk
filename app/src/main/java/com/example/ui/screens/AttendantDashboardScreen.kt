@@ -78,6 +78,7 @@ import com.example.data.model.User
 import com.example.data.model.UserStatus
 import com.example.ui.components.BarLogoIcon
 import com.example.ui.components.ChangePasswordDialog
+import com.example.ui.components.DisputeBadge
 import com.example.ui.components.MetricStatCard
 import com.example.ui.components.ReconciliationBadge
 import com.example.ui.components.StatusBadge
@@ -655,6 +656,62 @@ fun AttendantDashboardScreen(
             }
         }
 
+        if (myDisputes.isNotEmpty()) {
+            item {
+                Text("MY DISPUTES", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+            }
+            items(myDisputes.sortedByDescending { it.createdAt }.take(10)) { dispute ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = dispute.itemName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            DisputeBadge(status = dispute.status)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${dispute.counterName} - Expected ${dispute.expectedQty}, counted ${dispute.reportedQty}",
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                        if (dispute.status == com.example.data.model.DisputeStatus.RESOLVED) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Resolved by ${dispute.resolvedByAdminName ?: "Admin"} - official stock ${dispute.adjustedStockQty ?: dispute.reportedQty}",
+                                fontSize = 12.sp,
+                                color = EmeraldGreen
+                            )
+                            if (dispute.resolutionNotes.isNotBlank()) {
+                                Text(
+                                    text = "Notes: ${dispute.resolutionNotes}",
+                                    fontSize = 12.sp,
+                                    color = Color.White.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = formatDateTime(dispute.createdAt),
+                            fontSize = 10.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+        }
         }
 
         // History: recent shifts and reconciliation with period filters.
