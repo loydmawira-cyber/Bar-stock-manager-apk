@@ -1079,7 +1079,11 @@ class BarStockViewModel(
 
     fun submitShiftClosing() {
         val shift = activeShift.value ?: return
-        val submittedCash = _submittedCashInput.value.toDoubleOrNull()
+        val submittedCash = _submittedPaymentInputs.value.entries
+            .firstOrNull { it.key.trim().equals("cash", ignoreCase = true) }
+            ?.value
+            ?.toDoubleOrNull()
+            ?: 0.0
         val submittedMpesa = _submittedMpesaInput.value.toDoubleOrNull() ?: 0.0
         val submittedCard = _submittedCardInput.value.toDoubleOrNull() ?: 0.0
         val submittedBank = _submittedBankInput.value.toDoubleOrNull() ?: 0.0
