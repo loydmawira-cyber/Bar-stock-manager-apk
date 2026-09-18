@@ -162,6 +162,7 @@ class BarStockViewModel(
     val allShifts = repository.allShifts.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allShiftClosings = repository.allShiftClosings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allDisputes = repository.allDisputes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allInventoryLosses = repository.allInventoryLosses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val openDisputes = repository.openDisputes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allReconciliations = repository.allReconciliations.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val allStockAdjustments = repository.allStockAdjustments.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1204,12 +1205,20 @@ class BarStockViewModel(
 
     fun acceptShortage(lossId: Long) {
         val user = _currentUser.value ?: return
-        viewModelScope.launch { repository.acceptShortage(lossId, user.id, user.name); autoBackup(); _toastMessage.emit("Shortage accepted and posted to your shift.") }
+        viewModelScope.launch {
+            val done = repository.acceptShortage(lossId, user.id, user.name)
+            if (done) autoBackup()
+            _toastMessage.emit(if (done) "Shortage accepted and posted to your shift." else "This shortage was already decided.")
+        }
     }
 
     fun rejectShortage(lossId: Long, reason: String) {
         val user = _currentUser.value ?: return
-        viewModelScope.launch { repository.rejectShortage(lossId, user.id, user.name, reason); autoBackup(); _toastMessage.emit("Shortage rejected and sent for Admin review.") }
+        viewModelScope.launch {
+            val done = repository.rejectShortage(lossId, user.id, user.name, reason)
+            if (done) autoBackup()
+            _toastMessage.emit(if (done) "Shortage rejected and sent for Admin review." else "This shortage was already decided.")
+        }
     }
 
     private fun canDecideShortage(): UserRole? {
