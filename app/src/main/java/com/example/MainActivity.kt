@@ -354,6 +354,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             counters = allCounters,
                             shifts = allShifts,
                             disputes = allDisputes,
+                            allItems = allItems,
                             reconciliations = allReconciliations,
                             unreadNotificationsCount = notifications.filter { !it.isRead }.size,
                             onSelectCounterForShift = { counter ->
@@ -462,8 +463,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         DisputeManagementScreen(
                             currentUser = user,
                             disputes = allDisputes,
-                            onResolveDispute = { disputeId, notes, stockQty ->
-                                viewModel.resolveDispute(disputeId, notes, stockQty)
+                            items = allItems,
+                            onResolveDispute = { disputeId, notes, stockQty, looseMl ->
+                                viewModel.resolveDispute(disputeId, notes, stockQty, looseMl)
                             }
                         )
                     }
