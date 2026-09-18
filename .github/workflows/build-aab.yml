@@ -32,6 +32,11 @@ jobs:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
           accept-android-sdk-licenses: true
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
       - name: Restore upload keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -48,7 +53,7 @@ jobs:
             -alias "$KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:'
 
       - name: Build signed release AAB
-        run: ./gradlew bundleRelease --stacktrace --no-daemon
+        run: gradle bundleRelease --stacktrace --no-daemon
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
