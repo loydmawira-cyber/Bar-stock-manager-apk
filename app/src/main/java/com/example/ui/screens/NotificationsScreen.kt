@@ -51,7 +51,9 @@ import com.example.ui.theme.SkyBlue
 fun NotificationsScreen(
     notifications: List<AppNotification>,
     onMarkAsRead: (Long) -> Unit,
-    onMarkAllAsRead: () -> Unit
+    onMarkAllAsRead: () -> Unit,
+    onAcceptShortage: (Long) -> Unit = {},
+    onRejectShortage: (Long, String) -> Unit = { _, _ -> }
 ) {
     val unreadCount = notifications.count { !it.isRead }
 
@@ -117,6 +119,9 @@ fun NotificationsScreen(
                     val (iconColor, bgColor) = when (notif.type) {
                         NotificationType.DISPUTE_RAISED -> Pair(CrimsonRed, Color(0xFF2A1515))
                         NotificationType.DISPUTE_RESOLVED -> Pair(EmeraldGreen, DarkSurface)
+                        NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED -> Pair(AmberPrimary, Color(0xFF2A1C08))
+                        NotificationType.SHORTAGE_ACCEPTED -> Pair(EmeraldGreen, DarkSurface)
+                        NotificationType.SHORTAGE_REJECTED -> Pair(CrimsonRed, Color(0xFF2A1515))
                         NotificationType.SHIFT_CLOSED_RECONCILIATION -> Pair(EmeraldGreen, DarkSurface)
                         NotificationType.MID_SHIFT_ADJUSTMENT -> Pair(AmberPrimary, DarkSurface)
                         NotificationType.NEW_SIGNUP -> Pair(SkyBlue, DarkSurface)
@@ -203,6 +208,17 @@ fun NotificationsScreen(
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+
+                                if (notif.type == NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED && notif.relatedId != null) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = { onAcceptShortage(notif.relatedId) }) {
+                                            Text("Accept Shortage", color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                        TextButton(onClick = { onRejectShortage(notif.relatedId, "Rejected by previous attendant for Admin review") }) {
+                                            Text("Reject", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
