@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import android.app.Activity
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +22,6 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
@@ -32,8 +30,6 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -62,7 +58,6 @@ import com.example.data.billing.BillingPlan
 import com.example.data.billing.BillingStatus
 import com.example.data.billing.SubscriptionTier
 import com.example.ui.theme.AmberPrimary
-import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
 
 @Composable
@@ -73,15 +68,10 @@ fun GoogleBillingAdminSection(
     onLaunchPurchase: (Activity, BillingPlan) -> Unit,
     onRestorePurchases: () -> Unit,
     onOpenSubscriptions: (Activity) -> Unit,
-    onActivateSandbox: (BillingPlan) -> Unit,
-    onSimulateTrialActive: () -> Unit,
-    onSimulateTrialExpired: () -> Unit,
-    onResetSubscription: () -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
     var showFeatureDetails by remember { mutableStateOf(false) }
-    var showSandboxTools by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -373,110 +363,9 @@ fun GoogleBillingAdminSection(
                 isCurrentPlan = isCurrentPaidPlan,
                 isTrialActive = billingStatus.isTrialActive,
                 onSubscribe = {
-                    if (activity != null) {
-                        onLaunchPurchase(activity, plan)
-                    } else {
-                        onActivateSandbox(plan)
-                    }
+                    activity?.let { onLaunchPurchase(it, plan) }
                 }
             )
-        }
-
-        // Testing & Sandbox Controls for Admin
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showSandboxTools = !showSandboxTools },
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.HourglassEmpty, contentDescription = null, tint = AmberPrimary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Admin Trial & Billing Sandbox Tools",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        text = if (showSandboxTools) "Hide" else "Expand ▼",
-                        fontSize = 11.sp,
-                        color = AmberPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                AnimatedVisibility(visible = showSandboxTools) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Quickly test the 6-month trial countdown, trial expiry, or $10/year subscription activation without waiting:",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = onSimulateTrialActive,
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Reset 6M Trial", fontSize = 10.sp, color = AmberPrimary)
-                            }
-
-                            Button(
-                                onClick = onSimulateTrialExpired,
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Expire Trial", fontSize = 10.sp, color = Color(0xFFEF4444))
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val annualPlan = availablePlans.firstOrNull { it.productId == com.example.data.billing.BillingManager.PRODUCT_ID_PREMIUM_ANNUAL }
-                            if (annualPlan != null) {
-                                Button(
-                                    onClick = { onActivateSandbox(annualPlan) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen.copy(alpha = 0.2f)),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Activate $10/Yr Sub", fontSize = 10.sp, color = EmeraldGreen, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = onResetSubscription,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("Reset All", fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         // Terms & Google Play Disclosure
