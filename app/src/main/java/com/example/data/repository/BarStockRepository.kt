@@ -558,6 +558,10 @@ class BarStockRepository(private val dao: BarStockDao) {
         dao.deleteCounter(counterId)
     }
 
+    /** Loose ml is only tracked for tot-enabled items that have a bottle size. */
+    suspend fun isMlTracked(itemId: Long): Boolean =
+        dao.getItemById(itemId)?.let { it.totEnabled && it.bottleVolumeMl > 0 } == true
+
     fun getCounterStocksWithItems(counterId: Long): Flow<List<CounterStockWithItem>> =
         dao.getCounterStocksWithItems(counterId)
 
@@ -801,6 +805,10 @@ class BarStockRepository(private val dao: BarStockDao) {
 
         // 4. Create Dispute records & Push Notifications
         verifications.filter { !it.isApproved || it.countedQty != it.systemQty || it.countedLooseMl != it.systemLooseMl }.forEach { disputedItem ->
+            // ml is only tracked for tot-enabled items
+            val mlTracked = dao.getItemById(disputedItem.itemId)?.let { it.totEnabled && it.bottleVolumeMl > 0 } == true
+            val systemLooseMl = if (mlTracked) disputedItem.systemLooseMl else 0
+            val countedLooseMl = if (mlTracked) disputedItem.countedLooseMl else 0
             val disputeId = dao.insertDispute(
                 Dispute(
                     shiftId = shiftId,
@@ -811,6 +819,8 @@ class BarStockRepository(private val dao: BarStockDao) {
                     expectedQty = disputedItem.systemQty,
                     reportedQty = disputedItem.countedQty,
                     discrepancy = disputedItem.countedQty - disputedItem.systemQty,
+                    expectedLooseMl = systemLooseMl,
+                    reportedLooseMl = countedLooseMl,
                     raisedByAttendantId = attendantId,
                     raisedByAttendantName = attendantName,
                     involvesPreviousAttendantId = lastClosedShift?.attendantId,
@@ -821,12 +831,15 @@ class BarStockRepository(private val dao: BarStockDao) {
 
             // Notify Admin
             val diffStr = if (disputedItem.countedQty > disputedItem.systemQty) "+${disputedItem.countedQty - disputedItem.systemQty}" else "${disputedItem.countedQty - disputedItem.systemQty}"
+            val expectedText = countLabel(disputedItem.systemQty, systemLooseMl)
+            val countedText = countLabel(disputedItem.countedQty, countedLooseMl)
+            val diffSuffix = if (systemLooseMl == 0 && countedLooseMl == 0) " (Diff $diffStr)" else ""
             dao.insertNotification(
                 AppNotification(
                     targetRole = UserRole.OWNER,
                     type = NotificationType.DISPUTE_RAISED,
                     title = "Dispute Raised at ${counter.name}",
-                    message = "$attendantName flagged ${disputedItem.itemName}: Expected ${disputedItem.systemQty}, Counted ${disputedItem.countedQty} (Diff $diffStr).",
+                    message = "$attendantName flagged ${disputedItem.itemName}: Expected $expectedText, Counted $countedText$diffSuffix.",
                     relatedId = disputeId
                 )
             )
@@ -839,7 +852,7 @@ class BarStockRepository(private val dao: BarStockDao) {
                         targetRole = UserRole.ATTENDANT,
                         type = NotificationType.DISPUTE_RAISED,
                         title = "Dispute on Handover (${counter.name})",
-                        message = "Incoming attendant $attendantName disputed ${disputedItem.itemName} stock (Expected: ${disputedItem.systemQty}, Counted: ${disputedItem.countedQty}).",
+                        message = "Incoming attendant $attendantName disputed ${disputedItem.itemName} stock (Expected: $expectedText, Counted: $countedText).",
                         relatedId = disputeId
                     )
                 )
@@ -1148,14 +1161,14 @@ class BarStockRepository(private val dao: BarStockDao) {
                 unitType = item.unitType,
                 unitPrice = item.unitPrice,
                 openingQty = item.openingQty,
-                openingLooseMl = item.openingLooseMl,
+                openingLooseMl = if (item.totEnabled) item.openingLooseMl else 0,
                 adjustmentsQty = item.adjustmentQty,
                 effectiveOpeningQty = effectiveOpening,
                 closingQty = item.closingQty,
                 unitsSold = unitsSold,
                 expectedAmount = expectedAmount,
-                closingLooseMl = item.closingLooseMl,
-                bottleVolumeMl = item.bottleVolumeMl
+                closingLooseMl = if (item.totEnabled) item.closingLooseMl else 0,
+                bottleVolumeMl = if (item.totEnabled) item.bottleVolumeMl else 0   // ml summary only for tot-enabled items
             )
         }
         dao.insertShiftClosings(closingEntities)
@@ -1268,23 +1281,29 @@ class BarStockRepository(private val dao: BarStockDao) {
     val openDisputes: Flow<List<Dispute>> = dao.getDisputesByStatus(DisputeStatus.OPEN)
     fun getDisputesForAttendant(attendantId: Long): Flow<List<Dispute>> = dao.getDisputesForAttendant(attendantId)
 
+    private fun countLabel(qty: Int, looseMl: Int): String =
+        if (looseMl > 0) "$qty btl + $looseMl ml" else "$qty"
+
     private fun shortageLabel(bottles: Int, looseMl: Int): String =
         if (looseMl > 0) "$bottles bottle(s) + $looseMl ml" else "$bottles bottle(s)"
 
-    suspend fun resolveDispute(disputeId: Long, resolutionNotes: String, adminName: String, adjustedStockQty: Int?) {
+    suspend fun resolveDispute(disputeId: Long, resolutionNotes: String, adminName: String, adjustedStockQty: Int?, adjustedLooseMl: Int? = null) {
         val dispute = dao.getDisputeById(disputeId) ?: return
         if (dispute.status == DisputeStatus.RESOLVED) return
         val isMidShiftDispute = dispute.resolutionNotes.startsWith("Mid-shift adjustment")
         // Opening-count disputes: use the loose ml the attendant entered vs what the system expected.
         val verification = if (isMidShiftDispute) null
             else dao.getStockVerificationsForShiftSync(dispute.shiftId).firstOrNull { it.itemId == dispute.itemId }
-        val expectedLooseMl = verification?.systemLooseMl ?: 0
-        val confirmedLooseMl = verification?.attendantLooseMl ?: 0
-        val confirmedQty = adjustedStockQty?.coerceAtLeast(0) ?: dispute.reportedQty
-        val previousShift = dao.getPreviousClosedShift(dispute.counterId, dispute.shiftId)
         val item = dao.getItemById(dispute.itemId)
         val unitValue = item?.unitPrice ?: 0.0
-        val volumeMl = item?.bottleVolumeMl ?: 0
+        // ml is only tracked for tot-enabled items
+        val volumeMl = if (item != null && item.totEnabled) item.bottleVolumeMl else 0
+        val expectedLooseMl = if (isMidShiftDispute || volumeMl == 0) 0 else (verification?.systemLooseMl ?: dispute.expectedLooseMl)
+        // Admin-confirmed loose ml wins; otherwise fall back to what the attendant counted.
+        val confirmedLooseMl = if (isMidShiftDispute || volumeMl == 0) 0
+            else (adjustedLooseMl?.coerceAtLeast(0) ?: verification?.attendantLooseMl ?: dispute.reportedLooseMl)
+        val confirmedQty = adjustedStockQty?.coerceAtLeast(0) ?: dispute.reportedQty
+        val previousShift = dao.getPreviousClosedShift(dispute.counterId, dispute.shiftId)
 
         var missingBottles = maxOf(0, dispute.expectedQty - confirmedQty)
         var missingLooseMl = 0
@@ -1299,7 +1318,7 @@ class BarStockRepository(private val dao: BarStockDao) {
         val shortageValue = Math.round((missingBottles * unitValue + looseValue) * 100.0) / 100.0
         val hasShortage = !isMidShiftDispute && (missingBottles > 0 || missingLooseMl > 0)
 
-        dao.updateDispute(dispute.copy(status = DisputeStatus.RESOLVED, resolutionNotes = resolutionNotes, resolvedByAdminName = adminName, resolvedAt = System.currentTimeMillis(), adjustedStockQty = confirmedQty))
+        dao.updateDispute(dispute.copy(status = DisputeStatus.RESOLVED, resolutionNotes = resolutionNotes, resolvedByAdminName = adminName, resolvedAt = System.currentTimeMillis(), adjustedStockQty = confirmedQty, adjustedLooseMl = if (isMidShiftDispute) null else confirmedLooseMl))
         if (isMidShiftDispute) {
             // The disputed units were taken off the counter when the attendant disputed them.
             // Put back only the units the Admin confirms were really received (never more than were added).
