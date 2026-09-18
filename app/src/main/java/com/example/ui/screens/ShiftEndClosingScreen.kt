@@ -219,21 +219,12 @@ fun ShiftEndClosingScreen(
                                 horizontalAlignment = Alignment.End
                             ) {
                                 Text(
-                                    text = if (item.totEnabled) {
-                                        if (item.openingLooseMl > 0) "Opening: ${item.effectiveOpening} bottles + ${item.openingLooseMl} ml"
-                                        else "Opening: ${item.effectiveOpening} bottles"
-                                    } else {
-                                        "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}"
-                                    },
+                                    text = if (item.totEnabled) "Opening: ${item.effectiveOpening} bottles" else "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}",
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = if (item.totEnabled) {
-                                        "Base: ${item.effectiveOpening * item.bottleVolumeMl + item.openingLooseMl} ml"
-                                    } else {
-                                        "Base: ${item.effectiveOpening}"
-                                    },
+                                    text = if (item.totEnabled) "Base: ${item.effectiveOpening * item.bottleVolumeMl} ml" else "Base: ${item.effectiveOpening}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = AmberPrimary
@@ -244,21 +235,24 @@ fun ShiftEndClosingScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Closing Count Input & Units Sold Output
-                    Row(
+                    // Responsive closing count controls. TOT inputs are stacked
+                    // vertically so labels never collide on narrow phone screens.
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Closing input stepper
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (item.totEnabled) "Closing bottles:" else "Closing Count:",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
+                        Text(
+                            text = if (item.totEnabled) "Closing balance" else "Closing count",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             IconButton(
                                 onClick = { onUpdateClosingQty(item.itemId, maxOf(0, item.closingQty - 1), item.closingLooseMl) },
                                 modifier = Modifier
@@ -266,10 +260,8 @@ fun ShiftEndClosingScreen(
                                     .clip(CircleShape)
                                     .background(DarkSurfaceVariant)
                             ) {
-                                Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
-
-                            Spacer(modifier = Modifier.width(6.dp))
 
                             OutlinedTextField(
                                 value = "${item.closingQty}",
@@ -277,15 +269,14 @@ fun ShiftEndClosingScreen(
                                     val count = str.filter { it.isDigit() }.toIntOrNull() ?: 0
                                     onUpdateClosingQty(item.itemId, count, item.closingLooseMl)
                                 },
+                                label = { Text(if (item.totEnabled) "Bottles" else "Count") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
-                                    .width(70.dp)
+                                    .weight(1f)
                                     .testTag("closing_qty_input_${item.itemId}"),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
                             )
-
-                            Spacer(modifier = Modifier.width(6.dp))
 
                             IconButton(
                                 onClick = { onUpdateClosingQty(item.itemId, item.closingQty + 1, item.closingLooseMl) },
@@ -304,29 +295,47 @@ fun ShiftEndClosingScreen(
                                         val ml = value.filter { it.isDigit() }.toIntOrNull() ?: 0
                                         onUpdateClosingQty(item.itemId, item.closingQty, ml)
                                     },
-                                    label = { Text("ml") },
+                                    label = { Text("Loose ml") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.width(78.dp),
+                                    modifier = Modifier
+                                        .width(112.dp)
+                                        .testTag("closing_loose_ml_input_${item.itemId}"),
                                     singleLine = true,
                                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
                                 )
                             }
                         }
 
-                        // Computed Sold & Amount
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = if (item.totEnabled) "Balance: ${item.closingQty} bottles ${item.closingLooseMl} ml" else "Sold: ${item.unitsSold}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = AmberPrimary
-                            )
-                            Text(
-                                text = formatCurrency(item.expectedAmount),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = EmeraldGreen
-                            )
+                        Surface(
+                            color = DarkSurfaceVariant.copy(alpha = 0.55f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (item.totEnabled) {
+                                        "Balance: ${item.closingQty} bottles + ${item.closingLooseMl} ml"
+                                    } else {
+                                        "Sold: ${item.unitsSold}"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AmberPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = formatCurrency(item.expectedAmount),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EmeraldGreen
+                                )
+                            }
                         }
                     }
                 }
