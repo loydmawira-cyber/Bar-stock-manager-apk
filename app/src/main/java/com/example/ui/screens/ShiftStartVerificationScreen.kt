@@ -281,7 +281,7 @@ fun ShiftStartVerificationScreen(
                             ) {
                                 Text("Actual balance", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    text = "${currentItem.systemQty} bottles + ${currentItem.systemLooseMl} ml",
+                                    text = if (currentItem.mlTracked) "${currentItem.systemQty} bottles + ${currentItem.systemLooseMl} ml" else "${currentItem.systemQty} units",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = AmberPrimary
@@ -383,23 +383,25 @@ fun ShiftStartVerificationScreen(
                                     )
                                 )
 
-                                OutlinedTextField(
-                                    value = "${currentItem.countedLooseMl}",
-                                    onValueChange = { str ->
-                                        val looseMl = str.filter { it.isDigit() }.toIntOrNull() ?: 0
-                                        onUpdateCountedLooseMl(currentItem.itemId, looseMl)
-                                    },
-                                    label = { Text("ml", fontSize = 11.sp) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier
-                                        .width(90.dp)
-                                        .testTag("counted_loose_ml_input_${currentItem.itemId}"),
-                                    singleLine = true,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = CrimsonRed,
-                                        unfocusedBorderColor = CrimsonRed.copy(alpha = 0.5f)
+                                if (currentItem.mlTracked) {
+                                    OutlinedTextField(
+                                        value = "${currentItem.countedLooseMl}",
+                                        onValueChange = { str ->
+                                            val looseMl = str.filter { it.isDigit() }.toIntOrNull() ?: 0
+                                            onUpdateCountedLooseMl(currentItem.itemId, looseMl)
+                                        },
+                                        label = { Text("ml", fontSize = 11.sp) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier
+                                            .width(90.dp)
+                                            .testTag("counted_loose_ml_input_${currentItem.itemId}"),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = CrimsonRed,
+                                            unfocusedBorderColor = CrimsonRed.copy(alpha = 0.5f)
+                                        )
                                     )
-                                )
+                                }
 
                                 IconButton(
                                     onClick = { onUpdateCountedQty(currentItem.itemId, currentItem.countedQty + 1) },

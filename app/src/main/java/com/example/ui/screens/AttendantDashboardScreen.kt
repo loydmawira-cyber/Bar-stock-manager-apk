@@ -116,6 +116,7 @@ fun AttendantDashboardScreen(
     counters: List<Counter>,
     shifts: List<Shift>,
     disputes: List<Dispute>,
+    allItems: List<com.example.data.model.Item> = emptyList(),
     reconciliations: List<Reconciliation>,
     unreadNotificationsCount: Int = 0,
     onSelectCounterForShift: (Counter) -> Unit,
@@ -661,6 +662,7 @@ fun AttendantDashboardScreen(
                 Text("MY DISPUTES", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
             }
             items(myDisputes.sortedByDescending { it.createdAt }.take(10)) { dispute ->
+                val mlTracked = allItems.firstOrNull { it.id == dispute.itemId }?.isMlTracked() == true
                 Card(
                     colors = CardDefaults.cardColors(containerColor = DarkSurface),
                     shape = RoundedCornerShape(12.dp),
@@ -683,14 +685,14 @@ fun AttendantDashboardScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${dispute.counterName} - Expected ${dispute.expectedQty}, counted ${dispute.reportedQty}",
+                            text = "${dispute.counterName} - Expected ${disputeCountLabel(dispute.expectedQty, dispute.expectedLooseMl, mlTracked)}, counted ${disputeCountLabel(dispute.reportedQty, dispute.reportedLooseMl, mlTracked)}",
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.7f)
                         )
                         if (dispute.status == com.example.data.model.DisputeStatus.RESOLVED) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Resolved by ${dispute.resolvedByAdminName ?: "Admin"} - official stock ${dispute.adjustedStockQty ?: dispute.reportedQty}",
+                                text = "Resolved by ${dispute.resolvedByAdminName ?: "Admin"} - official stock ${disputeCountLabel(dispute.adjustedStockQty ?: dispute.reportedQty, dispute.adjustedLooseMl ?: 0, mlTracked)}",
                                 fontSize = 12.sp,
                                 color = EmeraldGreen
                             )

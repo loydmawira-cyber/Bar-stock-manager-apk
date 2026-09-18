@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Dispute
 import com.example.data.model.DisputeStatus
+import com.example.data.model.Item
 import com.example.data.model.User
 import com.example.data.model.UserRole
 import com.example.ui.components.DisputeBadge
@@ -69,16 +70,36 @@ import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.DarkSurfaceVariant
 import com.example.ui.theme.EmeraldGreen
 
+/** True only for tot-enabled items that have a bottle size; only these are measured in ml. */
+fun Item.isMlTracked(): Boolean = totEnabled && bottleVolumeMl > 0
+
+/**
+ * Tot-enabled items ([isMlTracked] = true): "3 btl + 250 ml", or "3 btl" when there is no loose ml.
+ * Every other item: "3" + [plainSuffix] - ml is never shown.
+ */
+fun disputeCountLabel(qty: Int, looseMl: Int, isMlTracked: Boolean, plainSuffix: String = ""): String = when {
+    isMlTracked && looseMl > 0 -> "$qty btl + $looseMl ml"
+    isMlTracked -> "$qty btl"
+    else -> "$qty$plainSuffix"
+}
+
+/** Total variance in ml between the counted and expected stock (bottle-measured items only). */
+private fun disputeVarianceMl(dispute: Dispute, bottleVolumeMl: Int): Int =
+    (dispute.reportedQty * bottleVolumeMl + dispute.reportedLooseMl) -
+        (dispute.expectedQty * bottleVolumeMl + dispute.expectedLooseMl)
+
 @Composable
 fun DisputeManagementScreen(
     currentUser: User,
     disputes: List<Dispute>,
-    onResolveDispute: (disputeId: Long, notes: String, adjustedStockQty: Int?) -> Unit
+    items: List<Item> = emptyList(),
+    onResolveDispute: (disputeId: Long, notes: String, adjustedStockQty: Int?, adjustedLooseMl: Int?) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Open Disputes, 1: Resolved Disputes
     var resolvingDispute by remember { mutableStateOf<Dispute?>(null) }
     var resolutionNotesText by remember { mutableStateOf("") }
     var adjustedStockText by remember { mutableStateOf("") }
+    var adjustedLooseMlText by remember { mutableStateOf("") }
 
     val filteredDisputes = disputes.filter {
         if (selectedTab == 0) it.status == DisputeStatus.OPEN else it.status == DisputeStatus.RESOLVED
@@ -158,7 +179,22 @@ fun DisputeManagementScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(filteredDisputes) { dispute ->
-                    val isDiscrepancyNegative = dispute.discrepancy < 0
+                    val disputeItem = items.firstOrNull { it.id == dispute.itemId }
+                    val hasVolume = disputeItem?.isMlTracked() == true
+                    val bottleVolumeMl = if (hasVolume) disputeItem?.bottleVolumeMl ?: 0 else 0
+                    val varianceMl = if (hasVolume) disputeVarianceMl(dispute, bottleVolumeMl) else 0
+                    val isDiscrepancyNegative = if (hasVolume) varianceMl < 0 else dispute.discrepancy < 0
+                    val varianceText = when {
+                        hasVolume && varianceMl == 0 -> "Matched"
+                        hasVolume -> {
+                            val abs = kotlin.math.abs(varianceMl)
+                            val label = if (abs >= bottleVolumeMl) disputeCountLabel(abs / bottleVolumeMl, abs % bottleVolumeMl, true) else "$abs ml"
+                            if (varianceMl > 0) "+$label Extra" else "-$label Shortage"
+                        }
+                        dispute.discrepancy > 0 -> "+${dispute.discrepancy} Extra"
+                        dispute.discrepancy == 0 -> "Matched"
+                        else -> "${dispute.discrepancy} Shortage"
+                    }
 
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -214,18 +250,18 @@ fun DisputeManagementScreen(
                             ) {
                                 Column {
                                     Text("System Expected", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${dispute.expectedQty} units", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
+                                    Text(disputeCountLabel(dispute.expectedQty, dispute.expectedLooseMl, hasVolume, " units"), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AmberPrimary)
                                 }
 
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("Physical Count", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${dispute.reportedQty} units", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(disputeCountLabel(dispute.reportedQty, dispute.reportedLooseMl, hasVolume, " units"), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
 
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text("Variance", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(
-                                        text = if (dispute.discrepancy > 0) "+${dispute.discrepancy} Extra" else "${dispute.discrepancy} Shortage",
+                                        text = varianceText,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = if (isDiscrepancyNegative) CrimsonRed else EmeraldGreen
@@ -276,7 +312,7 @@ fun DisputeManagementScreen(
                                         )
                                         if (dispute.adjustedStockQty != null) {
                                             Text(
-                                                text = "Official stock adjusted to ${dispute.adjustedStockQty} units.",
+                                                text = "Official stock adjusted to ${disputeCountLabel(dispute.adjustedStockQty, dispute.adjustedLooseMl ?: 0, hasVolume, " units")}.",
                                                 fontSize = 11.sp,
                                                 color = AmberPrimary
                                             )
@@ -293,6 +329,7 @@ fun DisputeManagementScreen(
                                         resolvingDispute = dispute
                                         resolutionNotesText = ""
                                         adjustedStockText = "${dispute.reportedQty}"
+                                        adjustedLooseMlText = "${dispute.reportedLooseMl}"
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = AmberPrimary),
                                     shape = RoundedCornerShape(8.dp),
@@ -316,7 +353,13 @@ fun DisputeManagementScreen(
     resolvingDispute?.let { dispute ->
         val stockQtyVal = adjustedStockText.toIntOrNull()
         val isStockQtyValid = stockQtyVal != null && stockQtyVal >= 0
-        val isFormValid = isStockQtyValid
+        val dialogItem = items.firstOrNull { it.id == dispute.itemId }
+        val dialogVolumeMl = dialogItem?.takeIf { it.isMlTracked() }?.bottleVolumeMl ?: 0
+        val isMidShiftDispute = dispute.resolutionNotes.startsWith("Mid-shift adjustment")
+        val showLooseMl = dialogVolumeMl > 0 && !isMidShiftDispute
+        val looseMlVal = adjustedLooseMlText.ifBlank { "0" }.toIntOrNull()
+        val isLooseMlValid = !showLooseMl || (looseMlVal != null && looseMlVal in 0 until dialogVolumeMl)
+        val isFormValid = isStockQtyValid && isLooseMlValid
 
         AlertDialog(
             onDismissRequest = { resolvingDispute = null },
@@ -342,10 +385,19 @@ fun DisputeManagementScreen(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
                     )
 
+                    if (showLooseMl) {
+                        Text(
+                            text = "Expected ${disputeCountLabel(dispute.expectedQty, dispute.expectedLooseMl, showLooseMl, " units")}, " +
+                                "counted ${disputeCountLabel(dispute.reportedQty, dispute.reportedLooseMl, showLooseMl, " units")}.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     OutlinedTextField(
                         value = adjustedStockText,
                         onValueChange = { adjustedStockText = it },
-                        label = requiredLabel("Official Counter Stock Quantity"),
+                        label = requiredLabel(if (showLooseMl) "Official Counter Stock (bottles)" else "Official Counter Stock Quantity"),
                         isError = adjustedStockText.isNotEmpty() && !isStockQtyValid,
                         supportingText = if (adjustedStockText.isNotEmpty() && !isStockQtyValid) {
                             { Text("Quantity must be >= 0", color = CrimsonRed) }
@@ -355,13 +407,32 @@ fun DisputeManagementScreen(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
                     )
+
+                    if (showLooseMl) {
+                        OutlinedTextField(
+                            value = adjustedLooseMlText,
+                            onValueChange = { adjustedLooseMlText = it.filter { c -> c.isDigit() } },
+                            label = optionalLabel("Official Loose ml"),
+                            isError = !isLooseMlValid,
+                            supportingText = {
+                                if (!isLooseMlValid) Text("Must be 0 to ${dialogVolumeMl - 1} ml (bottle = $dialogVolumeMl ml)", color = CrimsonRed)
+                                else Text("Open bottle remainder, 0 to ${dialogVolumeMl - 1} ml")
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("resolution_loose_ml_input"),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AmberPrimary)
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (isFormValid) {
-                            onResolveDispute(dispute.id, resolutionNotesText.trim(), stockQtyVal)
+                            onResolveDispute(dispute.id, resolutionNotesText.trim(), stockQtyVal, if (showLooseMl) looseMlVal else null)
                             resolvingDispute = null
                         }
                     },
