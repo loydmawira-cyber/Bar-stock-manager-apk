@@ -67,6 +67,7 @@ fun ShiftStartVerificationScreen(
     items: List<OpeningVerificationState>,
     onUpdateApproval: (itemId: Long, approved: Boolean) -> Unit,
     onUpdateCountedQty: (itemId: Long, count: Int) -> Unit,
+    onUpdateCountedLooseMl: (itemId: Long, looseMl: Int) -> Unit,
     onConfirmAndStartShift: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -223,6 +224,7 @@ fun ShiftStartVerificationScreen(
                                     onClick = {
                                         onUpdateApproval(item.itemId, true)
                                         onUpdateCountedQty(item.itemId, item.systemQty)
+                                        onUpdateCountedLooseMl(item.itemId, item.systemLooseMl)
                                     },
                                     label = { Text(
                                         "Approve (${item.systemQty} bottles + ${item.systemLooseMl} ml)",
@@ -313,6 +315,24 @@ fun ShiftStartVerificationScreen(
                                         modifier = Modifier
                                             .width(80.dp)
                                             .testTag("counted_qty_input_${item.itemId}"),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = CrimsonRed,
+                                            unfocusedBorderColor = CrimsonRed.copy(alpha = 0.5f)
+                                        )
+                                    )
+
+                                    OutlinedTextField(
+                                        value = "${item.countedLooseMl}",
+                                        onValueChange = { str ->
+                                            val looseMl = str.filter { it.isDigit() }.toIntOrNull() ?: 0
+                                            onUpdateCountedLooseMl(item.itemId, looseMl)
+                                        },
+                                        label = { Text("ml", fontSize = 11.sp) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier
+                                            .width(90.dp)
+                                            .testTag("counted_loose_ml_input_${item.itemId}"),
                                         singleLine = true,
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedBorderColor = CrimsonRed,
