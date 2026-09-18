@@ -971,18 +971,6 @@ class BarStockViewModel(
         }
     }
 
-    fun updateVerificationItemCountedLooseMl(itemId: Long, looseMl: Int) {
-        _verificationItems.value = _verificationItems.value.map {
-            if (it.itemId == itemId) {
-                val clamped = maxOf(0, looseMl)
-                it.copy(
-                    countedLooseMl = clamped,
-                    isApproved = it.countedQty == it.systemQty && clamped == it.systemLooseMl
-                )
-            } else it
-        }
-    }
-
     fun confirmOpeningStockAndStartShift() {
         val user = _currentUser.value ?: return
         val counter = _selectedCounterForShift.value ?: return
@@ -1196,6 +1184,16 @@ class BarStockViewModel(
             autoBackup()
             _toastMessage.emit("Dispute resolved successfully.")
         }
+    }
+
+    fun acceptShortage(lossId: Long) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch { repository.acceptShortage(lossId, user.id, user.name); autoBackup(); _toastMessage.emit("Shortage accepted and posted to your shift.") }
+    }
+
+    fun rejectShortage(lossId: Long, reason: String) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch { repository.rejectShortage(lossId, user.id, user.name, reason); autoBackup(); _toastMessage.emit("Shortage rejected and sent for Admin review.") }
     }
 
     // --- Admin Stock Adjustments (Restock) ---
