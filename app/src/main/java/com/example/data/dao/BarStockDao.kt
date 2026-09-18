@@ -12,6 +12,7 @@ import com.example.data.model.CounterStockWithItem
 import com.example.data.model.Dispute
 import com.example.data.model.DisputeStatus
 import com.example.data.model.Item
+import com.example.data.model.InventoryLoss
 import com.example.data.model.Reconciliation
 import com.example.data.model.Shift
 import com.example.data.model.ShiftClosing
@@ -300,6 +301,31 @@ interface BarStockDao {
 
     @Update
     suspend fun updateDispute(dispute: Dispute)
+
+    @Query("""
+        SELECT * FROM shifts
+        WHERE counterId = :counterId
+          AND status = 'CLOSED'
+          AND endTime < (SELECT startTime FROM shifts WHERE id = :currentShiftId)
+        ORDER BY endTime DESC
+        LIMIT 1
+    """)
+    suspend fun getPreviousClosedShift(counterId: Long, currentShiftId: Long): Shift?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertInventoryLoss(loss: InventoryLoss): Long
+
+    @Query("SELECT * FROM inventory_losses WHERE disputeId = :disputeId LIMIT 1")
+    suspend fun getInventoryLossForDispute(disputeId: Long): InventoryLoss?
+
+    @Query("SELECT * FROM inventory_losses WHERE id = :lossId LIMIT 1")
+    suspend fun getInventoryLossById(lossId: Long): InventoryLoss?
+
+    @Update
+    suspend fun updateInventoryLoss(loss: InventoryLoss)
+
+    @Query("SELECT * FROM inventory_losses ORDER BY createdAt DESC")
+    fun getAllInventoryLosses(): Flow<List<InventoryLoss>>
 
     // --- Stock Adjustments ---
     @Query("SELECT * FROM stock_adjustments ORDER BY timestamp DESC")
