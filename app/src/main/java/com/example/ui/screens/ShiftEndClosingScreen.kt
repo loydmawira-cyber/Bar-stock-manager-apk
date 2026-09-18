@@ -219,12 +219,21 @@ fun ShiftEndClosingScreen(
                                 horizontalAlignment = Alignment.End
                             ) {
                                 Text(
-                                    text = if (item.totEnabled) "Opening: ${item.effectiveOpening} bottles" else "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}",
+                                    text = if (item.totEnabled) {
+                                        if (item.openingLooseMl > 0) "Opening: ${item.effectiveOpening} bottles + ${item.openingLooseMl} ml"
+                                        else "Opening: ${item.effectiveOpening} bottles"
+                                    } else {
+                                        "Opening: ${item.openingQty}${if (item.adjustmentQty != 0) " (+${item.adjustmentQty})" else ""}"
+                                    },
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = if (item.totEnabled) "Base: ${item.effectiveOpening * item.bottleVolumeMl} ml" else "Base: ${item.effectiveOpening}",
+                                    text = if (item.totEnabled) {
+                                        "Base: ${item.effectiveOpening * item.bottleVolumeMl + item.openingLooseMl} ml"
+                                    } else {
+                                        "Base: ${item.effectiveOpening}"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = AmberPrimary
