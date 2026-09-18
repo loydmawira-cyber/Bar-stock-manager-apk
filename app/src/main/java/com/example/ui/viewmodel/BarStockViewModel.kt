@@ -95,13 +95,7 @@ data class ClosingCountState(
     val closingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
     val openingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
     val volumeSoldMl: Int get() = maxOf(0, openingVolumeMl - closingVolumeMl)
-    // For TOT items, whole bottles sold must be derived from volume, not bottle-count subtraction.
-    // Example: 750 ml opened and 600 ml remains = 150 ml sold = 0 bottles + tots.
-    val unitsSold: Int get() = if (totEnabled && bottleVolumeMl > 0) {
-        volumeSoldMl / bottleVolumeMl
-    } else {
-        maxOf(0, effectiveOpening - closingQty)
-    }
+    val unitsSold: Int get() = if (totEnabled && bottleVolumeMl > 0) volumeSoldMl / bottleVolumeMl else maxOf(0, effectiveOpening - closingQty)
     val expectedAmount: Double get() = if (totEnabled && bottleVolumeMl > 0) {
         val fullBottles = volumeSoldMl / bottleVolumeMl
         val remainderMl = volumeSoldMl % bottleVolumeMl
@@ -1112,8 +1106,12 @@ class BarStockViewModel(
                     unitPrice = item.unitPrice,
                     openingQty = item.openingQty,
                     adjustmentQty = item.adjustmentQty,
-                    closingQty = item.closingQty
-                    ,closingLooseMl = item.closingLooseMl
+                    closingQty = item.closingQty,
+                    closingLooseMl = item.closingLooseMl,
+                    totEnabled = item.totEnabled,
+                    bottleVolumeMl = item.bottleVolumeMl,
+                    totSizeMl = item.totSizeMl,
+                    totPrice = item.totPrice
                 )
             }
 
