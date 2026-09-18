@@ -73,7 +73,7 @@ class UserRoleConverter {
         Expense::class,
         ItemCostSnapshot::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(UserRoleConverter::class)
@@ -92,6 +92,7 @@ abstract class BarStockDatabase : RoomDatabase() {
                     "bar_stock_database"
                 )
                     .addMigrations(MIGRATION_5_6)
+                    .addMigrations(MIGRATION_6_7)
                     .fallbackToDestructiveMigration()
                     .addCallback(BarStockDatabaseCallback(scope))
                     .build()
@@ -105,6 +106,14 @@ abstract class BarStockDatabase : RoomDatabase() {
                 database.execSQL(
                     "ALTER TABLE shift_closings ADD COLUMN bottleVolumeMl INTEGER NOT NULL DEFAULT 0"
                 )
+            }
+        }
+
+        private val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE shift_closings ADD COLUMN openingLooseMl INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE stock_verifications ADD COLUMN systemLooseMl INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE stock_verifications ADD COLUMN attendantLooseMl INTEGER NOT NULL DEFAULT 0")
             }
         }
 
