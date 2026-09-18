@@ -14,6 +14,7 @@ import com.example.data.model.Dispute
 import com.example.data.model.Item
 import com.example.data.model.ItemCategory
 import com.example.data.model.ItemCostSnapshot
+import com.example.data.model.InventoryLoss
 import com.example.data.model.NotificationType
 import com.example.data.model.Reconciliation
 import com.example.data.model.ReconciliationType
@@ -71,9 +72,10 @@ class UserRoleConverter {
         StoreStock::class,
         PurchaseReceipt::class,
         Expense::class,
-        ItemCostSnapshot::class
+        ItemCostSnapshot::class,
+        InventoryLoss::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(UserRoleConverter::class)
@@ -93,6 +95,8 @@ abstract class BarStockDatabase : RoomDatabase() {
                 )
                     .addMigrations(MIGRATION_5_6)
                     .addMigrations(MIGRATION_6_7)
+                    .addMigrations(MIGRATION_7_8)
+                    .addMigrations(MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .addCallback(BarStockDatabaseCallback(scope))
                     .build()
@@ -114,6 +118,43 @@ abstract class BarStockDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE shift_closings ADD COLUMN openingLooseMl INTEGER NOT NULL DEFAULT 0")
                 database.execSQL("ALTER TABLE stock_verifications ADD COLUMN systemLooseMl INTEGER NOT NULL DEFAULT 0")
                 database.execSQL("ALTER TABLE stock_verifications ADD COLUMN attendantLooseMl INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE shifts ADD COLUMN inventoryShortageValue REAL NOT NULL DEFAULT 0.0")
+                database.execSQL("ALTER TABLE shifts ADD COLUMN totalAccountableVariance REAL NOT NULL DEFAULT 0.0")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS inventory_losses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        disputeId INTEGER NOT NULL,
+                        shiftId INTEGER NOT NULL,
+                        counterId INTEGER NOT NULL,
+                        counterName TEXT NOT NULL,
+                        itemId INTEGER NOT NULL,
+                        itemName TEXT NOT NULL,
+                        missingBottles INTEGER NOT NULL,
+                        missingLooseMl INTEGER NOT NULL DEFAULT 0,
+                        bottleVolumeMl INTEGER NOT NULL DEFAULT 0,
+                        unitValue REAL NOT NULL,
+                        totalValue REAL NOT NULL,
+                        reason TEXT NOT NULL,
+                        resolvedBy TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_inventory_losses_disputeId ON inventory_losses(disputeId)")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptanceStatus TEXT NOT NULL DEFAULT 'PENDING'")
+                database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptedByAttendantId INTEGER")
+                database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptedByAttendantName TEXT")
+                database.execSQL("ALTER TABLE inventory_losses ADD COLUMN acceptedAt INTEGER")
+                database.execSQL("ALTER TABLE inventory_losses ADD COLUMN rejectionReason TEXT")
             }
         }
 
