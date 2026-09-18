@@ -22,13 +22,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,9 +59,47 @@ fun NotificationsScreen(
     onMarkAsRead: (Long) -> Unit,
     onMarkAllAsRead: () -> Unit,
     onAcceptShortage: (Long) -> Unit = {},
-    onRejectShortage: (Long, String) -> Unit = { _, _ -> }
+    onRejectShortage: (Long, String) -> Unit = { _, _ -> },
+    onPostShortage: (Long) -> Unit = {},
+    onWaiveShortage: (Long) -> Unit = {}
 ) {
     val unreadCount = notifications.count { !it.isRead }
+
+    var rejectingLossId by remember { mutableStateOf<Long?>(null) }
+    var rejectReasonText by remember { mutableStateOf("") }
+
+    rejectingLossId?.let { lossId ->
+        AlertDialog(
+            onDismissRequest = { rejectingLossId = null },
+            title = { Text("Reject Shortage", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = rejectReasonText,
+                    onValueChange = { rejectReasonText = it },
+                    label = { Text("Why are you rejecting this shortage?") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRejectShortage(lossId, rejectReasonText.trim())
+                        rejectingLossId = null
+                        rejectReasonText = ""
+                    },
+                    enabled = rejectReasonText.isNotBlank()
+                ) {
+                    Text("Submit Rejection", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rejectingLossId = null; rejectReasonText = "" }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -209,12 +253,23 @@ fun NotificationsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
+                                if (notif.type == NotificationType.SHORTAGE_REJECTED && notif.relatedId != null) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = { onPostShortage(notif.relatedId) }) {
+                                            Text("Post to Attendant", color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                        }
+                                        TextButton(onClick = { onWaiveShortage(notif.relatedId) }) {
+                                            Text("Waive", color = AmberPrimary, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
                                 if (notif.type == NotificationType.SHORTAGE_ACCEPTANCE_REQUIRED && notif.relatedId != null) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         TextButton(onClick = { onAcceptShortage(notif.relatedId) }) {
                                             Text("Accept Shortage", color = EmeraldGreen, fontWeight = FontWeight.Bold)
                                         }
-                                        TextButton(onClick = { onRejectShortage(notif.relatedId, "Rejected by previous attendant for Admin review") }) {
+                                        TextButton(onClick = { rejectingLossId = notif.relatedId }) {
                                             Text("Reject", color = CrimsonRed, fontWeight = FontWeight.Bold)
                                         }
                                     }
