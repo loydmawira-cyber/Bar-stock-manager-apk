@@ -98,7 +98,7 @@ data class ClosingCountState(
 ) {
     val effectiveOpening: Int get() = openingQty + adjustmentQty
     val closingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) closingQty * bottleVolumeMl + closingLooseMl else closingQty
-    val openingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl else effectiveOpening
+    val openingVolumeMl: Int get() = if (totEnabled && bottleVolumeMl > 0) effectiveOpening * bottleVolumeMl + openingLooseMl else effectiveOpening
     val volumeSoldMl: Int get() = maxOf(0, openingVolumeMl - closingVolumeMl)
     val unitsSold: Int get() = if (totEnabled && bottleVolumeMl > 0) volumeSoldMl / bottleVolumeMl else maxOf(0, effectiveOpening - closingQty)
     val expectedAmount: Double get() = if (totEnabled && bottleVolumeMl > 0) {
