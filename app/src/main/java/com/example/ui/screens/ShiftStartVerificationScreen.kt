@@ -140,7 +140,9 @@ fun ShiftStartVerificationScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(items) { item ->
-                val hasDiscrepancy = !item.isApproved || (item.countedQty != item.systemQty)
+                val hasDiscrepancy = !item.isApproved ||
+                    item.countedQty != item.systemQty ||
+                    item.countedLooseMl != item.systemLooseMl
                 val diff = item.countedQty - item.systemQty
 
                 Card(
@@ -191,12 +193,12 @@ fun ShiftStartVerificationScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
-                                        text = "System Qty",
+                                        text = "Actual balance",
                                         fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = "${item.systemQty}",
+                                        text = "${item.systemQty} bottles + ${item.systemLooseMl} ml",
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = AmberPrimary
@@ -215,12 +217,17 @@ fun ShiftStartVerificationScreen(
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilterChip(
-                                    selected = item.isApproved && item.countedQty == item.systemQty,
+                                    selected = item.isApproved &&
+                                        item.countedQty == item.systemQty &&
+                                        item.countedLooseMl == item.systemLooseMl,
                                     onClick = {
                                         onUpdateApproval(item.itemId, true)
                                         onUpdateCountedQty(item.itemId, item.systemQty)
                                     },
-                                    label = { Text("Approve (${item.systemQty})", fontSize = 12.sp) },
+                                    label = { Text(
+                                        "Approve (${item.systemQty} bottles + ${item.systemLooseMl} ml)",
+                                        fontSize = 12.sp
+                                    ) },
                                     leadingIcon = {
                                         Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
                                     },
@@ -232,7 +239,9 @@ fun ShiftStartVerificationScreen(
                                 )
 
                                 FilterChip(
-                                    selected = !item.isApproved || item.countedQty != item.systemQty,
+                                    selected = !item.isApproved ||
+                                        item.countedQty != item.systemQty ||
+                                        item.countedLooseMl != item.systemLooseMl,
                                     onClick = {
                                         onUpdateApproval(item.itemId, false)
                                     },
@@ -255,7 +264,9 @@ fun ShiftStartVerificationScreen(
                                     shape = RoundedCornerShape(6.dp)
                                 ) {
                                     Text(
-                                        text = if (diff > 0) "+$diff Extra" else "$diff Shortage",
+                                        text = if (item.countedLooseMl != item.systemLooseMl) {
+                                            "TOT remainder differs"
+                                        } else if (diff > 0) "+$diff Extra" else "$diff Shortage",
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -266,7 +277,11 @@ fun ShiftStartVerificationScreen(
                         }
 
                         // If disapproved, show actual physical count input
-                        AnimatedVisibility(visible = !item.isApproved || item.countedQty != item.systemQty) {
+                        AnimatedVisibility(
+                            visible = !item.isApproved ||
+                                item.countedQty != item.systemQty ||
+                                item.countedLooseMl != item.systemLooseMl
+                        ) {
                             Column(modifier = Modifier.padding(top = 10.dp)) {
                                 Text(
                                     text = "Enter actual physical count on shelf:",
