@@ -34,6 +34,8 @@ data class Shift(
     val totalSubmittedBank: Double = 0.0,
     val submittedPaymentBreakdown: String = "",
     val variance: Double = 0.0,
+    val inventoryShortageValue: Double = 0.0,
+    val totalAccountableVariance: Double = 0.0,
     val reconciliationType: ReconciliationType = ReconciliationType.NONE,
     val disputeCount: Int = 0,
     val notes: String = ""
