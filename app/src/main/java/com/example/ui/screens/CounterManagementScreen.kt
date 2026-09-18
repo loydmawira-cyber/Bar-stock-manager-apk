@@ -398,7 +398,16 @@ fun CounterManagementScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text("On Shelf", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("${stock.currentQuantity}", fontSize = 16.sp, fontWeight = FontWeight.Black, color = AmberPrimary)
+                                        Text(
+                                            text = if (stock.looseMl > 0) {
+                                                "${stock.currentQuantity} bottles + ${stock.looseMl} ml"
+                                            } else {
+                                                "${stock.currentQuantity} bottles"
+                                            },
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = AmberPrimary
+                                        )
                                     }
                                 }
 
@@ -632,7 +641,13 @@ fun CounterManagementScreen(
                                         ) {
                                             Text(itm.name)
                                             Text(
-                                                text = if (inStock != null) "Current: ${inStock.currentQuantity}" else "New",
+                                                text = if (inStock != null) {
+                                                    if (inStock.looseMl > 0) {
+                                                        "Current: ${inStock.currentQuantity} bottles + ${inStock.looseMl} ml"
+                                                    } else {
+                                                        "Current: ${inStock.currentQuantity} bottles"
+                                                    }
+                                                } else "New",
                                                 color = if (inStock != null) AmberPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
