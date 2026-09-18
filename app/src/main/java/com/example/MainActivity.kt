@@ -652,7 +652,9 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             viewModel.markAllNotificationsAsRead()
                         },
                         onAcceptShortage = { lossId -> viewModel.acceptShortage(lossId) },
-                        onRejectShortage = { lossId, reason -> viewModel.rejectShortage(lossId, reason) }
+                        onRejectShortage = { lossId, reason -> viewModel.rejectShortage(lossId, reason) },
+                        onPostShortage = { lossId -> viewModel.postRejectedShortage(lossId) },
+                        onWaiveShortage = { lossId -> viewModel.waiveRejectedShortage(lossId) }
                     )
                 }
             }
