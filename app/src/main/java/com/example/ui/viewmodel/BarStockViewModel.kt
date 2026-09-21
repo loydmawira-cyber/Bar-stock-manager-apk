@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -937,30 +938,32 @@ class BarStockViewModel(
             }
             _selectedCounterForShift.value = counter
 
-            // Load counter stock for verification
-            val stocks = repository.getCounterStocksWithItems(counter.id)
-            stocks.collect { stockList ->
-                _verificationItems.value = stockList.map { item ->
-                    val mlTracked = repository.isMlTracked(item.itemId)
-                    val looseMl = if (mlTracked) item.looseMl else 0
-                    OpeningVerificationState(
-                        itemId = item.itemId,
-                        itemName = item.itemName,
-                        category = item.category,
-                        unitType = item.unitType,
-                        unitPrice = item.unitPrice,
-                        systemQty = item.currentQuantity,
-                        systemLooseMl = looseMl,
-                        countedQty = item.currentQuantity,
-                        countedLooseMl = looseMl,
-                        isApproved = true,
-                        verified = false,
-                        mlTracked = mlTracked
-                    )
-                }
-                _currentScreen.value = AppScreen.SHIFT_VERIFICATION
-                return@collect
+            // Load a ONE-TIME snapshot of the counter stock for verification.
+            // (Previously this used collect{} on the live Room Flow. `return@collect`
+            // only exits the lambda, it does not stop collecting, so the collector kept
+            // running forever and every later change to counter stock - or a cloud sync -
+            // rewrote the verification list and forced the screen back to
+            // SHIFT_VERIFICATION, even after the shift had started.)
+            val stockList = repository.getCounterStocksWithItems(counter.id).first()
+            _verificationItems.value = stockList.map { item ->
+                val mlTracked = repository.isMlTracked(item.itemId)
+                val looseMl = if (mlTracked) item.looseMl else 0
+                OpeningVerificationState(
+                    itemId = item.itemId,
+                    itemName = item.itemName,
+                    category = item.category,
+                    unitType = item.unitType,
+                    unitPrice = item.unitPrice,
+                    systemQty = item.currentQuantity,
+                    systemLooseMl = looseMl,
+                    countedQty = item.currentQuantity,
+                    countedLooseMl = looseMl,
+                    isApproved = true,
+                    verified = false,
+                    mlTracked = mlTracked
+                )
             }
+            _currentScreen.value = AppScreen.SHIFT_VERIFICATION
         }
     }
 
@@ -994,10 +997,15 @@ class BarStockViewModel(
         }
     }
 
+    private var isStartingShift = false
+
     fun confirmOpeningStockAndStartShift() {
         val user = _currentUser.value ?: return
         val counter = _selectedCounterForShift.value ?: return
         val items = _verificationItems.value
+        // Ignore double taps so we never open two shifts on the same counter.
+        if (isStartingShift) return
+        isStartingShift = true
 
         viewModelScope.launch {
             val inputs = items.map { item ->
@@ -1015,12 +1023,18 @@ class BarStockViewModel(
                 )
             }
 
-            val shiftId = repository.startShiftWithVerification(
-                counterId = counter.id,
-                attendantId = user.id,
-                attendantName = user.name,
-                verifications = inputs
-            )
+            val shiftId = try {
+                repository.startShiftWithVerification(
+                    counterId = counter.id,
+                    attendantId = user.id,
+                    attendantName = user.name,
+                    verifications = inputs
+                )
+            } catch (e: Exception) {
+                isStartingShift = false
+                _toastMessage.emit("Could not start shift: ${e.message ?: "please try again"}")
+                return@launch
+            }
 
             val disputeCount = items.count { !it.isApproved || it.countedQty != it.systemQty }
             if (disputeCount > 0) {
@@ -1030,7 +1044,16 @@ class BarStockViewModel(
             }
 
             autoBackup()
-            _currentScreen.value = AppScreen.ACTIVE_SHIFT
+
+            // Clear the verification state and go straight to the home/overview.
+            _verificationItems.value = emptyList()
+            _selectedCounterForShift.value = null
+            isStartingShift = false
+            _currentScreen.value = if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) {
+                AppScreen.ADMIN_DASHBOARD
+            } else {
+                AppScreen.ATTENDANT_DASHBOARD
+            }
         }
     }
 
