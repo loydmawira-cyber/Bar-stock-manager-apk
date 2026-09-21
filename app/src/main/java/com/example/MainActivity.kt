@@ -390,6 +390,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             viewModel.updateVerificationItemCountedLooseMl(itemId, looseMl)
                         },
                         onConfirmAndStartShift = {
+                            attendantDashboardTab = AttendantDashboardTab.OVERVIEW
                             viewModel.confirmOpeningStockAndStartShift()
                         },
                         onCancel = {
