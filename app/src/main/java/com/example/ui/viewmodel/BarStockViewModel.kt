@@ -68,7 +68,8 @@ enum class AppScreen {
     STORE_INVENTORY,
     EXPENSES_MANAGEMENT,
     PROFIT_LOSS_REPORT,
-    MONTHLY_REPORTS
+    MONTHLY_REPORTS,
+    USER_MANUAL
 }
 
 data class OpeningVerificationState(
