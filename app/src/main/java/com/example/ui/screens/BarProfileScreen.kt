@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MonetizationOn
@@ -103,7 +104,10 @@ fun BarProfileScreen(
         openingHours: String
     ) -> Unit,
     onNavigate: (AppScreen) -> Unit,
-    onChangePasswordClick: () -> Unit = {}
+    onChangePasswordClick: () -> Unit = {},
+    hasPin: Boolean = false,
+    onSetPinClick: () -> Unit = {},
+    onRemovePinClick: () -> Unit = {}
 ) {
     var barName by remember(barProfile) { mutableStateOf(barProfile.barName) }
     var location by remember(barProfile) { mutableStateOf(barProfile.location) }
@@ -280,6 +284,37 @@ fun BarProfileScreen(
                             Icon(Icons.Filled.Key, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Change Password", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onSetPinClick() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, AmberPrimary),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (hasPin) "Change Quick PIN" else "Set Quick PIN", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        if (hasPin) {
+                            OutlinedButton(
+                                onClick = { onRemovePinClick() },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                contentPadding = PaddingValues(vertical = 12.dp, horizontal = 14.dp)
+                            ) {
+                                Text("Remove", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

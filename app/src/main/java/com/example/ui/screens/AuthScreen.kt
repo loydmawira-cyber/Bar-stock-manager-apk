@@ -102,8 +102,77 @@ enum class AuthMode {
     RESET_PASSWORD
 }
 
+/**
+ * Entry point for signing in. If anyone on this device has set a quick PIN, the PIN pad is shown first
+ * (with a "Use email & password instead" escape hatch); otherwise the regular sign-in form is shown.
+ */
 @Composable
 fun AuthScreen(
+    barProfile: BarProfile,
+    users: List<User>,
+    onLoginUser: (User) -> Unit,
+    onLoginCredentials: (identifier: String, password: String) -> Unit,
+    onRegisterBarAndAdmin: (
+        barName: String,
+        location: String,
+        adminName: String,
+        phone: String,
+        email: String,
+        password: String
+    ) -> Unit,
+    onSelfResetPassword: (identifier: String, newPassword: String) -> Unit,
+    onSendPasswordResetEmail: ((email: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) -> Unit)? = null,
+    phoneAuthManager: com.example.ui.viewmodel.PhoneAuthManager? = null,
+    onLoginPhoneCredential: ((com.google.firebase.auth.PhoneAuthCredential, String) -> Unit)? = null,
+    pinUserIds: Set<Long> = emptySet(),
+    onLoginWithPin: ((userId: Long, pin: String, onResult: (com.example.data.util.PinResult) -> Unit) -> Unit)? = null
+) {
+    var usePassword by remember { mutableStateOf(false) }
+    var waitedForUsers by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(2000)
+        waitedForUsers = true
+    }
+
+    val pinUsers = users.filter {
+        it.id in pinUserIds && it.status == com.example.data.model.UserStatus.APPROVED
+    }
+    val wantsPin = onLoginWithPin != null && !usePassword && pinUserIds.isNotEmpty()
+
+    if (wantsPin && pinUsers.isNotEmpty()) {
+        PinLoginScreen(
+            barProfile = barProfile,
+            pinUsers = pinUsers,
+            onLoginWithPin = onLoginWithPin!!,
+            onUsePassword = { usePassword = true }
+        )
+    } else if (wantsPin && !waitedForUsers) {
+        // Local accounts are still loading from the database; avoid flashing the password form.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = AmberPrimary)
+        }
+    } else {
+        PasswordAuthScreen(
+            barProfile = barProfile,
+            users = users,
+            onLoginUser = onLoginUser,
+            onLoginCredentials = onLoginCredentials,
+            onRegisterBarAndAdmin = onRegisterBarAndAdmin,
+            onSelfResetPassword = onSelfResetPassword,
+            onSendPasswordResetEmail = onSendPasswordResetEmail,
+            phoneAuthManager = phoneAuthManager,
+            onLoginPhoneCredential = onLoginPhoneCredential
+        )
+    }
+}
+
+@Composable
+private fun PasswordAuthScreen(
     barProfile: BarProfile,
     users: List<User>,
     onLoginUser: (User) -> Unit,
