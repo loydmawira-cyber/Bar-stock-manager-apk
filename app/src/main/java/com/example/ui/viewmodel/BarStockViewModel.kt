@@ -44,6 +44,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import com.example.data.util.PinManager
+import com.example.data.util.PinResult
 
 enum class AppScreen {
     AUTH,
@@ -113,6 +118,7 @@ class BarStockViewModel(
     private val repository: BarStockRepository,
     private val backupService: BackupService,
     private val billingManager: BillingManager,
+    private val pinManager: PinManager,
     private val monthlyReportService: MonthlyReportService = MonthlyReportService()
 ) : ViewModel() {
 
@@ -438,6 +444,109 @@ class BarStockViewModel(
         } else {
             _currentScreen.value = AppScreen.ATTENDANT_DASHBOARD
         }
+        // Returning from an auto-lock: put the same person back on the screen they left.
+        val resume = resumeScreen
+        if (resume != null && resumeUserId == user.id && resume != AppScreen.AUTH) {
+            _currentScreen.value = resume
+        }
+        resumeScreen = null
+        resumeUserId = null
+    }
+
+    // --- Quick PIN sign-in ---
+    private val _pinUserIds = MutableStateFlow(pinManager.usersWithPin())
+    /** Local user ids that have a PIN set on this device. */
+    val pinUserIds: StateFlow<Set<Long>> = _pinUserIds.asStateFlow()
+
+    private val _showChangePinDialog = MutableStateFlow(false)
+    val showChangePinDialog: StateFlow<Boolean> = _showChangePinDialog.asStateFlow()
+
+    fun openPinSetup() { _showChangePinDialog.value = true }
+    fun dismissPinSetup() {
+        _showChangePinDialog.value = false
+    }
+
+    private var resumeScreen: AppScreen? = null
+    private var resumeUserId: Long? = null
+
+    /**
+     * Auto-lock: returns to the PIN pad without wiping any data. Only locks people who set a PIN,
+     * so nobody gets locked out of a session they can't unlock.
+     */
+    fun lockApp() {
+        val user = _currentUser.value ?: return
+        if (!pinManager.hasPin(user.id)) return
+        resumeScreen = _currentScreen.value
+        resumeUserId = user.id
+        _currentUser.value = null
+        _currentScreen.value = AppScreen.AUTH
+    }
+
+    fun setPinForCurrentUser(pin: String) {
+        val user = _currentUser.value ?: return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) { pinManager.setPin(user.id, pin) }
+                _pinUserIds.value = pinManager.usersWithPin()
+                dismissPinSetup()
+                _toastMessage.emit("PIN saved. Use it to sign in next time.")
+            } catch (e: Exception) {
+                _toastMessage.emit("Could not save PIN: ${e.message ?: "unknown error"}")
+            }
+        }
+    }
+
+    fun removePinForCurrentUser() {
+        val user = _currentUser.value ?: return
+        pinManager.clearPin(user.id)
+        _pinUserIds.value = pinManager.usersWithPin()
+        viewModelScope.launch { _toastMessage.emit("PIN removed.") }
+    }
+
+    fun currentUserHasPin(): Boolean = _currentUser.value?.let { pinManager.hasPin(it.id) } ?: false
+
+    /** Drops PINs of accounts that no longer exist locally (deleted users). */
+    fun pruneStalePins(validUserIds: Set<Long>) {
+        if (validUserIds.isEmpty()) return
+        pinManager.retainOnly(validUserIds)
+        _pinUserIds.value = pinManager.usersWithPin()
+    }
+
+    fun loginWithPin(userId: Long, pin: String, onResult: (PinResult) -> Unit) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.Default) { pinManager.verify(userId, pin) }
+            _pinUserIds.value = pinManager.usersWithPin()
+
+            if (result is PinResult.Success) {
+                // Refresh from the cloud when possible (picks up revoked accounts); never block when offline.
+                _isSyncing.value = true
+                try {
+                    if (FirebaseAuth.getInstance().currentUser != null) {
+                        withTimeoutOrNull(6000) { backupService.syncData() }
+                    }
+                } catch (e: Exception) {
+                    // offline or sync failure: continue with local data
+                } finally {
+                    _isSyncing.value = false
+                }
+
+                val user = repository.getUserById(userId)
+                if (user == null) {
+                    pinManager.clearPin(userId)
+                    _pinUserIds.value = pinManager.usersWithPin()
+                    _toastMessage.emit("Please sign in with your email and password.")
+                    onResult(PinResult.NotSet)
+                } else {
+                    onResult(result)
+                    loginUser(user)
+                }
+            } else {
+                if (result is PinResult.LockedOut) {
+                    _toastMessage.emit("Too many wrong PIN attempts. Please sign in with your password.")
+                }
+                onResult(result)
+            }
+        }
     }
 
     val phoneAuthManager = PhoneAuthManager()
@@ -661,6 +770,8 @@ class BarStockViewModel(
                 // Ensure latest local snapshot is saved to cloud before clearing user
                 backupService.backupData()
                 repository.clearAllDataForNewBar()
+                pinManager.clearAll()
+                _pinUserIds.value = emptySet()
                 FirebaseAuth.getInstance().signOut()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -699,6 +810,8 @@ class BarStockViewModel(
             try {
                 // Clear previous bar's local data to ensure total data isolation for the new bar
                 repository.clearAllDataForNewBar()
+                pinManager.clearAll()
+                _pinUserIds.value = emptySet()
 
                 val updated = com.example.data.model.BarProfile(
                     id = 1L,
