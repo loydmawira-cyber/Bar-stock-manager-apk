@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
         val repository = BarStockRepository(database.barStockDao())
         val backupService = com.example.data.repository.BackupService(database.barStockDao())
         val billingManager = BillingManager(applicationContext, lifecycleScope)
+        val pinManager = com.example.data.util.PinManager(applicationContext)
 
         var syncJob: kotlinx.coroutines.Job? = null
         database.invalidationTracker.addObserver(object : androidx.room.InvalidationTracker.Observer(
@@ -98,7 +99,7 @@ class MainActivity : ComponentActivity() {
                     factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return BarStockViewModel(repository, backupService, billingManager) as T
+                            return BarStockViewModel(repository, backupService, billingManager, pinManager) as T
                         }
                     }
                 )
@@ -109,6 +110,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private const val AUTO_LOCK_MS = 60_000L
+
 @Composable
 fun BarStockApp(viewModel: BarStockViewModel) {
     val barProfile by viewModel.barProfile.collectAsState()
@@ -116,6 +119,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
     val currentUser by viewModel.currentUser.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val allUsers by viewModel.allUsers.collectAsState()
+    val pinUserIds by viewModel.pinUserIds.collectAsState()
+    val showChangePinDialog by viewModel.showChangePinDialog.collectAsState()
     val pendingUsers by viewModel.pendingUsers.collectAsState()
     val attendants by viewModel.attendants.collectAsState()
 
@@ -278,6 +283,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                         barProfile = barProfile,
                         users = allUsers,
                         onLoginUser = { user -> viewModel.loginUser(user) },
+                        pinUserIds = pinUserIds,
+                        onLoginWithPin = { userId, pin, onResult -> viewModel.loginWithPin(userId, pin, onResult) },
                         onLoginCredentials = { identifier, password ->
                             viewModel.loginWithCredentials(identifier, password)
                         },
@@ -342,7 +349,10 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                             viewModel.updateBarProfile(name, location, icon, photo, phone, currency, paymentMethods, manager, hours)
                         },
                         onNavigate = { screen -> viewModel.navigateTo(screen) },
-                        onChangePasswordClick = { showPasswordDialog = true }
+                        onChangePasswordClick = { showPasswordDialog = true },
+                        hasPin = currentUser?.id?.let { it in pinUserIds } == true,
+                        onSetPinClick = { viewModel.openPinSetup() },
+                        onRemovePinClick = { viewModel.removePinForCurrentUser() }
                     )
                 }
 
@@ -665,6 +675,40 @@ fun BarStockApp(viewModel: BarStockViewModel) {
             }
         }
     }
+    }
+
+    // Drop PINs for accounts that were deleted.
+    LaunchedEffect(allUsers) {
+        viewModel.pruneStalePins(allUsers.map { it.id }.toSet())
+    }
+
+    if (currentUser != null && showChangePinDialog) {
+        com.example.ui.components.SetPinDialog(
+            userName = currentUser!!.name,
+            isChange = currentUser?.id?.let { it in pinUserIds } == true,
+            onSetPin = { pin -> viewModel.setPinForCurrentUser(pin) },
+            onDismiss = { viewModel.dismissPinSetup() }
+        )
+    }
+
+    // Auto-lock: ask for the PIN again after the app has been in the background for a minute.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        var leftAt = 0L
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> leftAt = android.os.SystemClock.elapsedRealtime()
+                androidx.lifecycle.Lifecycle.Event.ON_START -> {
+                    if (leftAt != 0L && android.os.SystemClock.elapsedRealtime() - leftAt >= AUTO_LOCK_MS) {
+                        viewModel.lockApp()
+                    }
+                    leftAt = 0L
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (showPasswordDialog && currentUser != null) {
