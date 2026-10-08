@@ -62,6 +62,7 @@ import com.example.ui.screens.ReceiptsScreen
 import com.example.ui.screens.ExpensesScreen
 import com.example.ui.screens.ProfitAndLossScreen
 import com.example.ui.screens.UserManagementScreen
+import com.example.ui.screens.UserManualScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.BarStockViewModel
@@ -190,6 +191,7 @@ fun BarStockApp(viewModel: BarStockViewModel) {
             AppScreen.EXPENSES_MANAGEMENT -> "Expense Management"
             AppScreen.PROFIT_LOSS_REPORT -> "P&L Statement"
             AppScreen.MONTHLY_REPORTS -> "Monthly Reports"
+            AppScreen.USER_MANUAL -> "User Manual"
             AppScreen.NOTIFICATIONS -> "Notification Center"
         }
 
@@ -213,6 +215,8 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                                 viewModel.navigateTo(if (user.role == UserRole.OWNER || user.role == UserRole.MANAGER) AppScreen.ADMIN_DASHBOARD else AppScreen.ATTENDANT_DASHBOARD)
                             } else if (currentScreen == AppScreen.ACTIVE_SHIFT) {
                                 viewModel.navigateTo(AppScreen.ATTENDANT_DASHBOARD)
+                            } else if (currentScreen == AppScreen.USER_MANUAL) {
+                                viewModel.navigateTo(AppScreen.BAR_PROFILE)
                             } else if (currentScreen == AppScreen.SHIFT_CLOSING) {
                                 viewModel.navigateTo(AppScreen.ACTIVE_SHIFT)
                             } else {
@@ -654,6 +658,10 @@ fun BarStockApp(viewModel: BarStockViewModel) {
                     } else {
                         LaunchedEffect(Unit) { viewModel.navigateTo(AppScreen.ADMIN_DASHBOARD) }
                     }
+                }
+
+                AppScreen.USER_MANUAL -> {
+                    UserManualScreen(currentRole = currentUser?.role)
                 }
 
                 AppScreen.NOTIFICATIONS -> {
