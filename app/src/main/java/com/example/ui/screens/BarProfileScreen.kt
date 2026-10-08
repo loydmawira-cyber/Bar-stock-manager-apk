@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalBar
@@ -287,36 +288,73 @@ fun BarProfileScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        // Security & Help: visible to every role
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = "Security & Help",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Sign in faster with a 4-digit PIN, or read the guide for your role.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onSetPinClick() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, AmberPrimary),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
+                        Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (hasPin) "Change Quick PIN" else "Set Quick PIN", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    if (hasPin) {
                         OutlinedButton(
-                            onClick = { onSetPinClick() },
-                            modifier = Modifier.weight(1f),
+                            onClick = { onRemovePinClick() },
                             shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, AmberPrimary),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
-                            contentPadding = PaddingValues(vertical = 12.dp)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                            contentPadding = PaddingValues(vertical = 12.dp, horizontal = 14.dp)
                         ) {
-                            Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (hasPin) "Change Quick PIN" else "Set Quick PIN", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                        if (hasPin) {
-                            OutlinedButton(
-                                onClick = { onRemovePinClick() },
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-                                contentPadding = PaddingValues(vertical = 12.dp, horizontal = 14.dp)
-                            ) {
-                                Text("Remove", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
+                            Text("Remove", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedButton(
+                    onClick = { onNavigate(AppScreen.USER_MANUAL) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("open_user_manual_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, AmberPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AmberPrimary),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("User Manual", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
